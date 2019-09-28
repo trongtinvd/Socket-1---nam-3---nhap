@@ -1,11 +1,11 @@
-﻿<Window x:Class="MainServer.MainWindow"
+﻿<Window x:Class="Client.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:MainServer"
+        xmlns:local="clr-namespace:Client"
         mc:Ignorable="d"
-        Title="MainServer" Height="450" Width="300">
+        Title="Client" Height="450" Width="300">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
@@ -15,7 +15,7 @@
             <RowDefinition Height="1*"/>
             <RowDefinition Height="2*"/>
             <RowDefinition Height="4*"/>
-            <RowDefinition Height="4*"/>            
+            <RowDefinition Height="4*"/>
         </Grid.RowDefinitions>
 
         <Grid Grid.Column="0" Grid.Row="0">
@@ -24,24 +24,24 @@
                 <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" VerticalAlignment="Center">Your IP:</TextBlock>
+            <TextBlock Grid.Row="0" VerticalAlignment="Center">Main server IP:</TextBlock>
             <TextBox Name="MainServerIP" Grid.Row="1" VerticalAlignment="Center">localhost</TextBox>
-            
+
         </Grid>
-        
+
         <Grid Grid.Column="1" Grid.Row="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" VerticalAlignment="Center">Your port:</TextBlock>
+            <TextBlock Grid.Row="0" VerticalAlignment="Center">Main server port:</TextBlock>
             <TextBox Name="MainServerPort" Grid.Row="1" VerticalAlignment="Center">9999</TextBox>
 
         </Grid>
 
-        <Button Name="CloseButton" Grid.Column="0" Grid.Row="1" Content="Close server"/>
-        <Button Name="StartButton" Grid.Column="1" Grid.Row="1" Content="Start server"/>
+        <Button Name="CloseButton" Grid.Column="0" Grid.Row="1" Content="Close connect"/>
+        <Button Name="StartButton" Grid.Column="1" Grid.Row="1" Content="Start connect"/>
 
         <Grid Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="2">
             <Grid.RowDefinitions>
@@ -49,16 +49,23 @@
                 <RowDefinition Height="5*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Text="Connected Clients:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="ClientList">
+            <TextBlock Grid.Row="0" Text="Available file for download:" VerticalAlignment="Center"/>
+            <ListView Grid.Row="1" Name="FileList">
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn Header="Client IP" Width="150" DisplayMemberBinding="{Binding IP}"/>
-                        <GridViewColumn Header="Client port" Width="150" DisplayMemberBinding="{Binding Port}"/>
+                        <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>
+                        <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
+                        <GridViewColumn Width="20">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="↓"/>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
                     </GridView>
                 </ListView.View>
             </ListView>
-            
+
         </Grid>
 
         <Grid Grid.Column="0" Grid.Row="3" Grid.ColumnSpan="2">
@@ -67,12 +74,13 @@
                 <RowDefinition Height="5*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Text="Connected File Server:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="FileServerList">
+            <TextBlock Grid.Row="0" Text="Downloading:" VerticalAlignment="Center"/>
+            <ListView Grid.Row="1" Name="DownloadList">
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn Header="Server IP" Width="150" DisplayMemberBinding="{Binding IP}"/>
-                        <GridViewColumn Header="Server port" Width="150" DisplayMemberBinding="{Binding Port}"/>
+                        <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>
+                        <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
+                        <GridViewColumn Header="%" Width="50" DisplayMemberBinding="{Binding Percentage}"/>
                     </GridView>
                 </ListView.View>
             </ListView>
