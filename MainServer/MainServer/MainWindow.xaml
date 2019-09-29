@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MainServer"
         mc:Ignorable="d"
-        Title="MainServer" Height="450" Width="300">
+        Title="MainServer" Height="450" Width="300" Closed="Window_Closed">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
@@ -40,8 +40,8 @@
 
         </Grid>
 
-        <Button Name="CloseButton" Grid.Column="0" Grid.Row="1" Content="Close server"/>
-        <Button Name="StartButton" Grid.Column="1" Grid.Row="1" Content="Start server"/>
+        <Button Name="CloseButton" Grid.Column="0" Grid.Row="1" Content="Close server" Click="CloseButton_Click"/>
+        <Button Name="StartButton" Grid.Column="1" Grid.Row="1" Content="Start server" Click="StartButton_Click"/>
 
         <Grid Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="2">
             <Grid.RowDefinitions>
