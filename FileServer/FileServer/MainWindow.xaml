@@ -49,7 +49,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Available file:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="FileList">
+            <ListView Grid.Row="1" Name="FileList" SizeChanged="FileList_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>

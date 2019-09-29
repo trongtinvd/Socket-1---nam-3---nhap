@@ -50,7 +50,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Connected Clients:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="ClientList">
+            <ListView Grid.Row="1" Name="ClientList" SizeChanged="ClientList_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="Client IP" Width="150" DisplayMemberBinding="{Binding IP}"/>
@@ -68,7 +68,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Connected File Server:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="FileServerList">
+            <ListView Grid.Row="1" Name="FileServerList" SizeChanged="FileServerList_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="Server IP" Width="150" DisplayMemberBinding="{Binding IP}"/>
