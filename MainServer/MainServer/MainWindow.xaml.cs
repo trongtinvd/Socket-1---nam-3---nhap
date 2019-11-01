@@ -15,6 +15,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.IO;
+using System.Collections.ObjectModel;
 
 namespace MainServer
 {
@@ -23,17 +25,18 @@ namespace MainServer
     /// </summary>
     public partial class MainWindow : Window
     {
+        object lockObject = new object();
+
         TcpListener Listener;
-        Thread serverListener;
-        List<FileServerHandler> fileServersItem;
-        List<ClientHandler> clientsItem;
+        Thread startServerThread;
+        Thread checkConnectThread;
+
+        List<FileServerHandler> fileServersItem = new List<FileServerHandler>();
+        List<ClientHandler> clientsItem = new List<ClientHandler>();
 
         public MainWindow()
         {
             InitializeComponent();
-            //UITest();
-            fileServersItem = new List<FileServerHandler>();
-            clientsItem = new List<ClientHandler>();
 
             FileServerList.ItemsSource = fileServersItem;
             ClientList.ItemsSource = clientsItem;
@@ -41,144 +44,169 @@ namespace MainServer
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            if (serverListener == null)
+            lock (lockObject)
             {
-                IPEndPoint localEP;
-                if (MainServerIP.Text == "localhost")
+                if (startServerThread == null)
                 {
-                    IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
-                    localEP = new IPEndPoint(hostEntry.AddressList[0], int.Parse(MainServerPort.Text));
+                    IPEndPoint IP = GetServerIP();
+                    startServerThread = new Thread(() => StartServer(IP));
+                    startServerThread.Start();
+                    //checkConnectThread = new Thread(() => CheckConnect(fileServersItem, clientsItem));
+                    //checkConnectThread.Start();
+                    MessageBox.Show("Your server had started.", "Main server: Server is started");
                 }
                 else
                 {
-                    localEP = new IPEndPoint(IPAddress.Parse(MainServerIP.Text), int.Parse(MainServerPort.Text));
+                    MessageBox.Show("your server had already started.", "Main server: Error");
                 }
-                serverListener = new Thread(() => StartServer(localEP));
-                serverListener.Start();
-                MessageBox.Show("Your server had started.", "Server is started");
             }
-            else
-            {
-                MessageBox.Show("your server had already started.", "Error");
-            }
-
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Listener != null)
+            lock (lockObject)
             {
-                Listener.Stop();
-                Listener = null;
-            }
-            if (serverListener != null)
-            {
-                serverListener.Abort();
-                serverListener = null;
+                if (startServerThread != null)
+                {
+                    Listener.Stop();
+                    startServerThread.Abort();
+
+                    Listener = null;
+                    startServerThread = null;
+                }
+
+                if (checkConnectThread != null)
+                {
+                    checkConnectThread.Abort();
+
+                    checkConnectThread = null;
+                }
+
+                fileServersItem.Clear();
+                clientsItem.Clear();
+                UpdateItemList();
             }
         }
 
-        private void ClientList_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void List_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ListView listView = sender as ListView;
             GridView gView = listView.View as GridView;
 
-            var workingWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth - 10; // take into account vertical scrollbar
+            var workingWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth - 10;
             var col1 = 0.70;
             var col2 = 0.30;
 
             gView.Columns[0].Width = workingWidth * col1;
             gView.Columns[1].Width = workingWidth * col2;
-        }
-
-        private void FileServerList_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            ListView listView = sender as ListView;
-            GridView gView = listView.View as GridView;
-
-            var workingWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth - 10; // take into account vertical scrollbar
-            var col1 = 0.70;
-            var col2 = 0.30;
-
-            gView.Columns[0].Width = workingWidth * col1;
-            gView.Columns[1].Width = workingWidth * col2;
-        }
-
-        public void UITest()
-        {
-            List<SampleConection> sampleConectionsList = new List<SampleConection>()
-            {
-                new SampleConection(){IP="172.16.0.4", Port="7792"},
-                new SampleConection(){IP="82.9.0.4", Port="7704"},
-                new SampleConection(){IP="192.16.0.4", Port="0492"},
-                new SampleConection(){IP="10.16.0.4", Port="7042"},
-                new SampleConection(){IP="7.16.0.4", Port="7704"},
-                new SampleConection(){IP="113.16.0.4", Port="0492"},
-                new SampleConection(){IP="201.16.0.4", Port="0492"},
-                new SampleConection(){IP="204.16.0.4", Port="0492"},
-                new SampleConection(){IP="85.16.0.4", Port="7042"},
-                new SampleConection(){IP="167.16.0.4", Port="0492"},
-                new SampleConection(){IP="42.16.0.4", Port="7042"},
-                new SampleConection(){IP="5.16.0.4", Port="7704"},
-                new SampleConection(){IP="10.16.0.4", Port="7042"},
-            };
-            FileServerList.ItemsSource = sampleConectionsList;
-            ClientList.ItemsSource = sampleConectionsList;
         }
 
         private void StartServer(IPEndPoint localEP)
         {
             try
-            {                
+            {
                 Listener = new TcpListener(localEP);
                 Listener.Start();
 
+
                 while (true)
                 {
-                    TcpClient client = new TcpClient();
-                    client.Client = Listener.AcceptSocket();
-                    NetworkStream stream = client.GetStream();
-                    string firstMessage = StreamTranslator.Read(stream);
+                    TcpClient client = Listener.AcceptTcpClient();
+                    MyStreamIO myStream = new MyStreamIO(client.GetStream());
+                    string firstMessage = myStream.ReadString();
 
                     if (firstMessage == "<isFileServer>")
                     {
                         FileServerHandler handler = new FileServerHandler(client);
+                        fileServersItem.Add(handler);
                         handler.Start();
-                        fileServersItem.Add(handler);                        
                     }
                     else if (firstMessage == "<isClient>")
                     {
                         ClientHandler handler = new ClientHandler(client);
-                        handler.Start();
                         clientsItem.Add(handler);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Unknown client trying to connect to this server. Connection abort.", "Unknown client trying to connect");
+                        handler.Start();
                     }
 
+                    UpdateItemList();
                 }
+
             }
             catch (ThreadAbortException e)
             {
-                MessageBox.Show("Your server had closed.", "Server close");
+                MessageBox.Show("Your server had closed.", "Main server: Server close");
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message, e.ToString());
+                MessageBox.Show(e.Message, "Main server: " + e.ToString());
             }
+        }
+
+        private IPEndPoint GetServerIP()
+        {
+            IPAddress address;
+            int port = int.Parse(MainServerPort.Text);
+
+
+            if (MainServerIP.Text == "localhost")
+            {
+                IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
+                address = hostEntry.AddressList[0];
+            }
+            else
+            {
+                address = IPAddress.Parse(MainServerIP.Text);
+            }
+
+
+            IPEndPoint IP = new IPEndPoint(address, port);
+            return IP;
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
             CloseButton_Click(this, null);
         }
-    }
 
-    class SampleConection
-    {
-        public string IP { get; set; }
-        public string Port { get; set; }
-    }
+        public void UpdateItemList()
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                FileServerList.Items.Refresh();
+                ClientList.Items.Refresh();
+            });
+        }
 
+        //private void CheckConnect(List<FileServerHandler> fileServerHandlersList, List<ClientHandler> clientHandlersList)
+        //{
+        //    while (true)
+        //    {
+        //        Thread.Sleep(5000);
+        //        try
+        //        {
+        //            foreach (FileServerHandler handle in fileServerHandlersList)
+        //            {
+        //                if (!SocketExtensions.IsConnected(handle.Client.Client))
+        //                {
+        //                    fileServerHandlersList.Remove(handle);
+        //                }
+        //            }
+
+        //            foreach (ClientHandler handle in clientHandlersList)
+        //            {
+        //                if (!SocketExtensions.IsConnected(handle.Client.Client))
+        //                {
+        //                    clientHandlersList.Remove(handle);
+        //                }
+        //            }
+
+        //            UpdateItemList();
+        //        }
+        //        catch (Exception e)
+        //        {
+        //            MessageBox.Show(e.Message, "Main server: " + e.ToString());
+        //        }
+        //    }
+        //}
+    }
 }
