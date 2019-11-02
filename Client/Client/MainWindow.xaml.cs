@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,13 +23,23 @@ namespace Client
     /// </summary>
     public partial class MainWindow : Window
     {
+        object lockObj = new object();
+
+        Thread connectToMainServerThread;
+        TcpClient client;
+
+        List<MyFile> fileItems = new List<MyFile>();
+        List<DownloadFile> downloadItems = new List<DownloadFile>();
+
         public MainWindow()
         {
             InitializeComponent();
-            UITest();
+
+            FileList.ItemsSource = fileItems;
+            DownloadList.ItemsSource = downloadItems;
         }
 
-        private void DownloadList_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void ListView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ListView listView = sender as ListView;
             GridView gView = listView.View as GridView;
@@ -41,52 +54,89 @@ namespace Client
             gView.Columns[2].Width = workingWidth * col3;
         }
 
-        private void FileList_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            ListView listView = sender as ListView;
-            GridView gView = listView.View as GridView;
-
-            var workingWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth - 10; // take into account vertical scrollbar
-            var col1 = 0.60;
-            var col2 = 0.20;
-            var col3 = 0.20;
-
-            gView.Columns[0].Width = workingWidth * col1;
-            gView.Columns[1].Width = workingWidth * col2;
-            gView.Columns[2].Width = workingWidth * col3;
+            lock (lockObj)
+            {
+                if (connectToMainServerThread == null)
+                {
+                    IPEndPoint serverIPEndPoint = GetServerIP();
+                    connectToMainServerThread = new Thread(() => connectToMainServer(serverIPEndPoint));
+                    connectToMainServerThread.Start();
+                    MessageBox.Show("Client has started,", "Client: started");
+                }
+                else
+                {
+                    MessageBox.Show("Client has already started,", "Client: started");
+                }
+            }
         }
 
-        public void UITest()
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            List<ExampleFile> list = new List<ExampleFile>() {
-                new ExampleFile(){Name = "AssassinCreed.exe", Size = "27kb"},
-                new ExampleFile(){Name = "GodOfWar.txt", Size = "89kb"},
-                new ExampleFile(){Name = "Terraria.pdf", Size = "88kb"},
-                new ExampleFile(){Name = "LeagueOfLegend.doc", Size = "6kb"},
-                new ExampleFile(){Name = "ShadowOfTheTombRaider.exe", Size = "14kb"},
-                new ExampleFile(){Name = "MonsterHunterWorld.docx", Size = "112kb"},
-                new ExampleFile(){Name = "Minecraft.html", Size = "25kb"},
-                new ExampleFile(){Name = "WorldOfWarcraft.css", Size = "97kb"},
-                new ExampleFile(){Name = "HeartStone.txt", Size = "16kb"},
-                new ExampleFile(){Name = "GTA5.docx", Size = "21kb"},
-                new ExampleFile(){Name = "DeadOrAlive.docx", Size = "44kb"},
-                new ExampleFile(){Name = "SkyGarden.mp3", Size = "61kb"},
-                new ExampleFile(){Name = "Gunny.dll", Size = "74kb"},
-                new ExampleFile(){Name = "FarCry.pdf", Size = "48kb"},
-                new ExampleFile(){Name = "DevilMayCry.xaml", Size = "52kb"},
-                new ExampleFile(){Name = "ResidentEvil.cs", Size = "8kb"},
-                new ExampleFile(){Name = "LifeIsStrange.c", Size = "11kb"},
+            lock (lockObj)
+            {
+                if (connectToMainServerThread != null)
+                {
+                    client.Close();
+                    connectToMainServerThread.Abort();
 
-            };
-            FileList.ItemsSource = list;
-            FileList.ItemsSource = list;
-            DownloadList.ItemsSource = list;
+                    client = null;
+                    connectToMainServerThread = null;
+                }
+
+                fileItems.Clear();
+                downloadItems.Clear();
+            }
         }
-    }
 
-    class ExampleFile
-    {
-        public string Name { get; set; }
-        public string Size { get; set; }
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            CloseButton_Click(sender, null);
+        }
+
+        private void connectToMainServer(IPEndPoint serverIPEndPoint)
+        {
+            client = new TcpClient(AddressFamily.InterNetworkV6);
+            client.Connect(serverIPEndPoint);
+            MyStreamIO myStream = new MyStreamIO(client.GetStream());
+            myStream.Write("<isClient>");
+
+            while (true)
+            {
+                Thread.Sleep(5000);
+                //work with server
+            }
+        }
+
+        private IPEndPoint GetServerIP()
+        {
+            IPAddress address;
+            int port = int.Parse(MainServerPort.Text);
+
+
+            if (MainServerIP.Text == "localhost")
+            {
+                IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
+                address = hostEntry.AddressList[0];
+            }
+            else
+            {
+                address = IPAddress.Parse(MainServerIP.Text);
+            }
+
+
+            IPEndPoint IP = new IPEndPoint(address, port);
+            return IP;
+        }
+
+        public void UpdateItemList()
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                FileList.Items.Refresh();
+                DownloadList.Items.Refresh();
+            });
+        }
     }
 }

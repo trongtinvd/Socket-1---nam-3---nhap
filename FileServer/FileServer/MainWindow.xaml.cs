@@ -84,7 +84,7 @@ namespace FileServer
         {
             lock (lockObject)
             {
-                if (client != null)
+                if (connectToMainServerThread != null)
                 {
                     client.Close();
                     connectToMainServerThread.Abort();
@@ -92,7 +92,7 @@ namespace FileServer
                     connectToMainServerThread = null;
                 }
 
-                if (listener != null)
+                if (listenClientRequestThread != null)
                 {
                     listener.Stop();
                     listenClientRequestThread.Abort();

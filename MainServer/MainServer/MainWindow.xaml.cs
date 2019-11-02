@@ -29,7 +29,6 @@ namespace MainServer
 
         TcpListener Listener;
         Thread startServerThread;
-        Thread checkConnectThread;
 
         List<FileServerHandler> fileServersItem = new List<FileServerHandler>();
         List<ClientHandler> clientsItem = new List<ClientHandler>();
@@ -51,13 +50,11 @@ namespace MainServer
                     IPEndPoint IP = GetServerIP();
                     startServerThread = new Thread(() => StartServer(IP));
                     startServerThread.Start();
-                    //checkConnectThread = new Thread(() => CheckConnect(fileServersItem, clientsItem));
-                    //checkConnectThread.Start();
-                    MessageBox.Show("Your server had started.", "Main server: Server is started");
+                    MessageBox.Show("Your server has started.", "Main server: Server is started");
                 }
                 else
                 {
-                    MessageBox.Show("your server had already started.", "Main server: Error");
+                    MessageBox.Show("your server has already started.", "Main server: Error");
                 }
             }
         }
@@ -73,13 +70,6 @@ namespace MainServer
 
                     Listener = null;
                     startServerThread = null;
-                }
-
-                if (checkConnectThread != null)
-                {
-                    checkConnectThread.Abort();
-
-                    checkConnectThread = null;
                 }
 
                 fileServersItem.Clear();
@@ -134,7 +124,7 @@ namespace MainServer
             }
             catch (ThreadAbortException e)
             {
-                MessageBox.Show("Your server had closed.", "Main server: Server close");
+                MessageBox.Show("Your server has closed.", "Main server: Server closed");
             }
             catch (Exception e)
             {
@@ -176,37 +166,5 @@ namespace MainServer
                 ClientList.Items.Refresh();
             });
         }
-
-        //private void CheckConnect(List<FileServerHandler> fileServerHandlersList, List<ClientHandler> clientHandlersList)
-        //{
-        //    while (true)
-        //    {
-        //        Thread.Sleep(5000);
-        //        try
-        //        {
-        //            foreach (FileServerHandler handle in fileServerHandlersList)
-        //            {
-        //                if (!SocketExtensions.IsConnected(handle.Client.Client))
-        //                {
-        //                    fileServerHandlersList.Remove(handle);
-        //                }
-        //            }
-
-        //            foreach (ClientHandler handle in clientHandlersList)
-        //            {
-        //                if (!SocketExtensions.IsConnected(handle.Client.Client))
-        //                {
-        //                    clientHandlersList.Remove(handle);
-        //                }
-        //            }
-
-        //            UpdateItemList();
-        //        }
-        //        catch (Exception e)
-        //        {
-        //            MessageBox.Show(e.Message, "Main server: " + e.ToString());
-        //        }
-        //    }
-        //}
     }
 }

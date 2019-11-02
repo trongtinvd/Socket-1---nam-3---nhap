@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Client"
         mc:Ignorable="d"
-        Title="Client" Height="450" Width="300">
+        Title="Client" Height="450" Width="300" Closed="Window_Closed">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
@@ -40,8 +40,8 @@
 
         </Grid>
 
-        <Button Name="CloseButton" Grid.Column="0" Grid.Row="1" Content="Close connect"/>
-        <Button Name="StartButton" Grid.Column="1" Grid.Row="1" Content="Start connect"/>
+        <Button Name="CloseButton" Grid.Column="0" Grid.Row="1" Content="Close connect" Click="CloseButton_Click"/>
+        <Button Name="StartButton" Grid.Column="1" Grid.Row="1" Content="Start connect" Click="StartButton_Click"/>
 
         <Grid Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="2">
             <Grid.RowDefinitions>
@@ -50,7 +50,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Available file for download:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="FileList" SizeChanged="FileList_SizeChanged">
+            <ListView Grid.Row="1" Name="FileList" SizeChanged="ListView_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>
@@ -75,7 +75,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Downloading:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="DownloadList" SizeChanged="DownloadList_SizeChanged">
+            <ListView Grid.Row="1" Name="DownloadList" SizeChanged="ListView_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>
