@@ -24,6 +24,13 @@ namespace FileServer
             stream.Write(buffer, 0, buffer.Length);
         }
 
+        public void Write(int number)
+        {
+            buffer = BitConverter.GetBytes(number);
+            stream.Flush();
+            stream.Write(buffer, 0, buffer.Length);
+        }
+
         public string ReadString()
         {
             buffer = new byte[1024];
@@ -31,6 +38,28 @@ namespace FileServer
             string message = Encoding.ASCII.GetString(buffer);
             message = message.TrimEnd(new char[] { (char)0 });
             return message;
+        }
+
+        public int ReadInt()
+        {
+            buffer = new byte[4];
+            int size = stream.Read(buffer, 0, buffer.Length);
+            int result = BitConverter.ToInt32(buffer, 0);
+            return result;
+        }
+
+        public void SendNEXT()
+        {
+            Write("<NEXT>");
+        }
+
+        public void GetNEXT()
+        {
+            string message = ReadString();
+            if (message == "<NEXT>")
+                return;
+            else
+                throw new Exception("Error in communicate between main server and file server.\nMessage received: " + message);
         }
     }
 }

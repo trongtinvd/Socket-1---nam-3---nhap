@@ -72,6 +72,11 @@ namespace MainServer
                     startServerThread = null;
                 }
 
+                foreach(FileServerHandler handler in fileServersItem)
+                {
+                    handler.Stop();
+                }
+
                 fileServersItem.Clear();
                 clientsItem.Clear();
                 UpdateItemList();
@@ -104,6 +109,7 @@ namespace MainServer
                     TcpClient client = Listener.AcceptTcpClient();
                     MyStreamIO myStream = new MyStreamIO(client.GetStream());
                     string firstMessage = myStream.ReadString();
+                    myStream.SendNEXT();
 
                     if (firstMessage == "<isFileServer>")
                     {

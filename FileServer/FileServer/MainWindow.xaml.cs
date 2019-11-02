@@ -28,18 +28,29 @@ namespace FileServer
         TcpClient client = null;
 
         object lockObject = new object();
+        string[] files;
 
         Thread connectToMainServerThread;
         Thread listenClientRequestThread;
 
         List<ClientHandler> clientList = new List<ClientHandler>();
-        //List<MyFile> fileList = new List<MyFile>();
+        List<MyFile> fileList = new List<MyFile>();
 
         public MainWindow()
         {
             InitializeComponent();
-            //FileList.ItemsSource = fileList;
-            ClientList.ItemsSource = clientList;
+
+            try
+            { 
+                FileList.ItemsSource = fileList;
+                ClientList.ItemsSource = clientList;
+
+                files = Directory.GetFiles("./file/");
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message, "File server - error initialize: " + e.ToString());
+            }
         }
 
         private void List_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -145,8 +156,21 @@ namespace FileServer
 
                 while (true)
                 {
-                    Thread.Sleep(5000);
                     //work with main server.
+
+                    int numberOfFile = files.Length;
+
+                    myStream.GetNEXT();
+                    myStream.Write("<sendFiles>");
+                    myStream.GetNEXT();
+                    myStream.Write(numberOfFile);
+                    foreach (string file in files)
+                    {
+                        myStream.GetNEXT();
+                        myStream.Write(file);
+                    }
+
+                    Thread.Sleep(50000);
                 }
 
             }
