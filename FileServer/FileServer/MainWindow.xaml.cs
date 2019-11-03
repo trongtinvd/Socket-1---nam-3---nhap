@@ -154,7 +154,7 @@ namespace FileServer
                 myStream = new MyStreamIO(client.GetStream());
 
                 myStream.Write("<isFileServer>");
-                ResponseToMainServer();
+                myStream.GetNEXT();
 
                 while (true)
                 {
@@ -163,19 +163,18 @@ namespace FileServer
                     int numberOfFile = files.Length;
 
                     myStream.Write("<sendFilesInfo>");
-                    ResponseToMainServer();
+                    myStream.GetNEXT();
 
                     myStream.Write(numberOfFile);
-                    ResponseToMainServer();
+                    myStream.GetNEXT();
 
                     foreach (string fileName in files)
                     {
                         myStream.Write(fileName);
-                        ResponseToMainServer();
-
-                        long size = new FileInfo(fileName).Length;
-                        myStream.Write(size);
-                        ResponseToMainServer();
+                        myStream.GetNEXT();
+                        
+                        myStream.Write(new FileInfo(fileName).Length);
+                        myStream.GetNEXT();
                     }
 
                     Thread.Sleep(5000);

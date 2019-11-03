@@ -78,7 +78,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MyFile.cs" />
+    <Compile Include="DownloadableFile.cs" />
     <Compile Include="MyStreamIO.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>

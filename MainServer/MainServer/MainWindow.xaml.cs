@@ -36,7 +36,7 @@ namespace MainServer
         public MainWindow()
         {
             InitializeComponent();
-
+            
             FileServerList.ItemsSource = fileServersItem;
             ClientList.ItemsSource = clientsItem;
         }
@@ -119,7 +119,7 @@ namespace MainServer
                     }
                     else if (firstMessage == "<isClient>")
                     {
-                        ClientHandler handler = new ClientHandler(client);
+                        ClientHandler handler = new ClientHandler(client, fileServersItem);
                         clientsItem.Add(handler);
                         handler.Start();
                     }

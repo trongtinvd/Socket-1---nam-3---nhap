@@ -9,13 +9,31 @@ namespace MainServer
 {
     internal class FileServerHandler
     {
-        private static object lockObj= new object();
+        private object lockObj = new object();
 
         private Thread workingWithFileServerThread;
         private MyStreamIO myStream;
-        private List<MyFile> files = new List<MyFile>();
+        private List<MyFile> _files = new List<MyFile>();
 
-        public TcpClient Client { set; get; }
+        public TcpClient Client { get; }
+
+        public List<MyFile> Files
+        {
+            get
+            {
+                lock (lockObj)
+                {
+                    return _files;
+                }
+            }
+            set
+            {
+                lock (lockObj)
+                {
+                    _files = value;
+                }
+            }
+        }
 
         public string IP
         {
@@ -51,7 +69,7 @@ namespace MainServer
 
         public void Start()
         {
-            workingWithFileServerThread = new Thread(() => workingWithFileServer(Client));
+            workingWithFileServerThread = new Thread(() => WorkingWithFileServer(Client));
             workingWithFileServerThread.Start();
         }
 
@@ -64,7 +82,7 @@ namespace MainServer
             }
         }
 
-        private void workingWithFileServer(TcpClient client)
+        private void WorkingWithFileServer(TcpClient client)
         {
             try
             {
@@ -76,19 +94,23 @@ namespace MainServer
                     switch (request)
                     {
                         case "<sendFilesInfo>":
-                            files.Clear();
-                            int number0fFile = myStream.ReadInt();
-                            myStream.SendNEXT();
-                            for (int i = 0; i < number0fFile; i++)
+                            lock (lockObj)
                             {
-                                string fileName = myStream.ReadString();
+                                Files.Clear();
+                                int number0fFile = myStream.ReadInt();
                                 myStream.SendNEXT();
+                                for (int i = 0; i < number0fFile; i++)
+                                {
+                                    string fileName = myStream.ReadString();
+                                    myStream.SendNEXT();
 
-                                long fileSize = myStream.ReadLong();
-                                myStream.SendNEXT();
+                                    long fileSize = myStream.ReadLong();
+                                    myStream.SendNEXT();
 
-                                MyFile file = new MyFile(fileName, fileSize);
-                                files.Add(file);
+                                    MyFile file = new MyFile(fileName, fileSize);
+                                    Files.Add(file);
+                                }
+
                             }
                             break;
 
@@ -100,7 +122,7 @@ namespace MainServer
             catch (Exception e)
             {
 
-            }            
+            }
         }
     }
 }

@@ -28,7 +28,7 @@ namespace Client
         Thread connectToMainServerThread;
         TcpClient client;
 
-        List<MyFile> fileItems = new List<MyFile>();
+        List<DownloadableFile> fileItems = new List<DownloadableFile>();
         List<DownloadFile> downloadItems = new List<DownloadFile>();
 
         public MainWindow()
@@ -101,11 +101,41 @@ namespace Client
             client.Connect(serverIPEndPoint);
             MyStreamIO myStream = new MyStreamIO(client.GetStream());
             myStream.Write("<isClient>");
+            myStream.GetNEXT();
 
             while (true)
             {
+                myStream.Write("<getAllFileInfo>");
+                int numberOfFileServer = myStream.ReadInt();
+                myStream.SendNEXT();
+                lock (lockObj)
+                {
+                    fileItems.Clear();
+
+                    for (int i = 0; i < numberOfFileServer; i++)
+                    {
+                        string ip = myStream.ReadString();
+                        myStream.SendNEXT();
+                        int port = myStream.ReadInt();
+                        myStream.SendNEXT();
+                        int numberOfFile = myStream.ReadInt();
+                        myStream.SendNEXT();
+
+                        for (int j = 0; j < numberOfFile; j++)
+                        {
+                            string fileName = myStream.ReadString();
+                            myStream.SendNEXT();
+                            long fileSize = myStream.ReadLong();
+                            myStream.SendNEXT();
+
+                            fileItems.Add(new DownloadableFile(fileName, fileSize, ip, port));
+                        }
+                    }
+
+                    UpdateItemList();
+                }
+
                 Thread.Sleep(5000);
-                //work with server
             }
         }
 
