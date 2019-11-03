@@ -31,6 +31,13 @@ namespace MainServer
             stream.Write(buffer, 0, buffer.Length);
         }
 
+        public void Write(long number)
+        {
+            buffer = BitConverter.GetBytes(number);
+            stream.Flush();
+            stream.Write(buffer, 0, buffer.Length);
+        }
+
         public string ReadString()
         {
             buffer = new byte[1024];
@@ -45,6 +52,14 @@ namespace MainServer
             buffer = new byte[4];
             int size = stream.Read(buffer, 0, buffer.Length);
             int result = BitConverter.ToInt32(buffer, 0);
+            return result;
+        }
+
+        public long ReadLong()
+        {
+            buffer = new byte[sizeof(long)];
+            int size = stream.Read(buffer, 0, buffer.Length);
+            long result = BitConverter.ToInt64(buffer, 0);
             return result;
         }
 

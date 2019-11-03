@@ -13,7 +13,7 @@ namespace MainServer
 
         private Thread workingWithFileServerThread;
         private MyStreamIO myStream;
-        private List<string> files = new List<string>();
+        private List<MyFile> files = new List<MyFile>();
 
         public TcpClient Client { set; get; }
 
@@ -46,6 +46,9 @@ namespace MainServer
             Stop();
         }
 
+
+
+
         public void Start()
         {
             workingWithFileServerThread = new Thread(() => workingWithFileServer(Client));
@@ -72,7 +75,7 @@ namespace MainServer
 
                     switch (request)
                     {
-                        case "<sendFiles>":
+                        case "<sendFilesInfo>":
                             files.Clear();
                             int number0fFile = myStream.ReadInt();
                             myStream.SendNEXT();
@@ -80,9 +83,17 @@ namespace MainServer
                             {
                                 string fileName = myStream.ReadString();
                                 myStream.SendNEXT();
-                                files.Add(fileName);
+
+                                long fileSize = myStream.ReadLong();
+                                myStream.SendNEXT();
+
+                                MyFile file = new MyFile(fileName, fileSize);
+                                files.Add(file);
                             }
                             break;
+
+                        default:
+                            throw new Exception("Error communicate with file server");
                     }
                 }
             }

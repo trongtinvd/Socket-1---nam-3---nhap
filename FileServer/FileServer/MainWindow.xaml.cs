@@ -29,6 +29,7 @@ namespace FileServer
 
         object lockObject = new object();
         string[] files;
+        MyStreamIO myStream;
 
         Thread connectToMainServerThread;
         Thread listenClientRequestThread;
@@ -41,7 +42,7 @@ namespace FileServer
             InitializeComponent();
 
             try
-            { 
+            {
                 FileList.ItemsSource = fileList;
                 ClientList.ItemsSource = clientList;
 
@@ -65,7 +66,7 @@ namespace FileServer
             gView.Columns[0].Width = workingWidth * col1;
             gView.Columns[1].Width = workingWidth * col2;
         }
-        
+
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
             lock (lockObject)
@@ -150,9 +151,10 @@ namespace FileServer
                 client = new TcpClient(AddressFamily.InterNetworkV6);
                 client.Connect(IP);
 
-                MyStreamIO myStream = new MyStreamIO(client.GetStream());
+                myStream = new MyStreamIO(client.GetStream());
 
                 myStream.Write("<isFileServer>");
+                ResponseToMainServer();
 
                 while (true)
                 {
@@ -160,17 +162,23 @@ namespace FileServer
 
                     int numberOfFile = files.Length;
 
-                    myStream.GetNEXT();
-                    myStream.Write("<sendFiles>");
-                    myStream.GetNEXT();
+                    myStream.Write("<sendFilesInfo>");
+                    ResponseToMainServer();
+
                     myStream.Write(numberOfFile);
-                    foreach (string file in files)
+                    ResponseToMainServer();
+
+                    foreach (string fileName in files)
                     {
-                        myStream.GetNEXT();
-                        myStream.Write(file);
+                        myStream.Write(fileName);
+                        ResponseToMainServer();
+
+                        long size = new FileInfo(fileName).Length;
+                        myStream.Write(size);
+                        ResponseToMainServer();
                     }
 
-                    Thread.Sleep(50000);
+                    Thread.Sleep(5000);
                 }
 
             }
@@ -180,18 +188,31 @@ namespace FileServer
             }
             catch (Exception e)
             {
-                MessageBox.Show("Error when working with main server\n" + e.Message, e.ToString());
+                MessageBox.Show("Error when working with main server\n" + e.Message,"File server: " + e.ToString());
             }
         }
 
         private void ListenClientRequest(IPEndPoint IP)
         {
-            
+
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
             CloseButton_Click(sender, null);
+        }
+        private void ResponseToMainServer()
+        {
+            string response = myStream.ReadString();
+            switch (response)
+            {
+                case "<NEXT>":
+
+                    break;
+
+                default:
+                    throw new Exception("Error communicate with main server");
+            }
         }
     }
 }
