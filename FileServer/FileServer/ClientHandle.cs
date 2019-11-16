@@ -92,8 +92,8 @@ namespace FileServer
                 //udpListener.Client.ReceiveTimeout = 5000;
                 while ((size = file.Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    string data = Encoding.UTF8.GetString(buffer).Substring(0, size);
-                    string hash = MyMD5Hash.GetMd5Hash(data);
+                    string data = Encoding.UTF8.GetString(buffer);
+                    string hash = MyMD5Hash.GetMd5Hash(buffer);
                     byte[] hashBuffer = Encoding.UTF8.GetBytes(hash);
 
                     do

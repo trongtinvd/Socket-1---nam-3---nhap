@@ -229,35 +229,42 @@ namespace Client
             long received = 0;
 
 
-            byte[] relyBuffer = udpClient.Receive(ref udpListenerIP);
-
-            messageBuffer = Encoding.UTF8.GetBytes("<ok>");
-            udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
-
-            using (FileStream newFile = File.OpenWrite(file.ShortenFileName))
+            try
             {
-                while (received < filesize)
+                byte[] relyBuffer = udpClient.Receive(ref udpListenerIP);
+
+                messageBuffer = Encoding.UTF8.GetBytes("<ok>");
+                udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
+
+                using (FileStream newFile = File.OpenWrite(file.ShortenFileName))
                 {
-                    hashBuffer = udpClient.Receive(ref udpListenerIP);
-                    dataBuffer = udpClient.Receive(ref udpListenerIP);
-
-                    string hash = Encoding.UTF8.GetString(hashBuffer);
-                    string data = Encoding.UTF8.GetString(dataBuffer);
-
-                    if(MyMD5Hash.VerifyMd5Hash(data, hash) == false)
+                    while (received < filesize)
                     {
-                        messageBuffer = Encoding.UTF8.GetBytes("<error>");
+                        hashBuffer = udpClient.Receive(ref udpListenerIP);
+                        dataBuffer = udpClient.Receive(ref udpListenerIP);
+
+                        string hash = Encoding.UTF8.GetString(hashBuffer);
+                        string data = Encoding.UTF8.GetString(dataBuffer);
+
+                        if (MyMD5Hash.VerifyMd5Hash(dataBuffer, hash) == false)
+                        {
+                            messageBuffer = Encoding.UTF8.GetBytes("<error>");
+                            udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
+                            continue;
+                        }
+
+                        messageBuffer = Encoding.UTF8.GetBytes("<ok>");
                         udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
-                        continue;
+
+                        newFile.Write(dataBuffer, 0, dataBuffer.Length);
+                        received += dataBuffer.Length;
+
                     }
-
-                    messageBuffer = Encoding.UTF8.GetBytes("<ok>");
-                    udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
-
-                    newFile.Write(dataBuffer, 0, dataBuffer.Length);
-                    received += dataBuffer.Length;
-
                 }
+            }
+            catch (Exception e)
+            {
+                string x = e.Message;                
             }
 
         }
