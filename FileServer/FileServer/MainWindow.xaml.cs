@@ -40,9 +40,7 @@ namespace FileServer
 
         List<ClientHandler> clientItems = new List<ClientHandler>();
         List<MyFile> fileItems = new List<MyFile>();
-
-
-
+            
         public MainWindow()
         {
             InitializeComponent();
@@ -106,21 +104,21 @@ namespace FileServer
         {
             lock (locker)
             {
-                if (connectToMainServerThread != null)
-                {
-                    client.Close();
-                    connectToMainServerThread.Abort();
-                    client = null;
-                    connectToMainServerThread = null;
-                }
 
-                if (listenClientRequestThread != null)
-                {
-                    listener.Stop();
-                    listenClientRequestThread.Abort();
-                    listener = null;
-                    listenClientRequestThread = null;
-                }
+                client?.Close();
+                client = null;
+
+                connectToMainServerThread?.Abort();
+                connectToMainServerThread = null;
+
+                listener?.Stop();
+                listener = null;
+
+                listenClientRequestThread?.Abort();
+                listenClientRequestThread = null;
+
+                MessageBox.Show("Your file server had stopped", "File server stop");
+
             }
         }
 
@@ -172,9 +170,9 @@ namespace FileServer
                 }
 
             }
-            catch (ThreadAbortException e)
+            catch (ThreadAbortException)
             {
-                MessageBox.Show("File server stop connect to main server.", "File server: stopped");
+               
             }
             catch (Exception e)
             {
@@ -196,13 +194,8 @@ namespace FileServer
                     clientItems.Add(handle);
                     handle.Start();
                 }
-
             }
-            catch(ThreadAbortException e)
-            {
-
-            }
-            catch(Exception e)
+            catch
             {
 
             }

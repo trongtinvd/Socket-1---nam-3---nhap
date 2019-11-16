@@ -24,20 +24,20 @@ namespace Client
     /// </summary>
     public partial class MainWindow : Window
     {
-        object lockObj = new object();
+        object locker = new object();
 
         Thread connectToMainServerThread;
         TcpClient client;
 
-        List<DownloadableFile> fileItems = new List<DownloadableFile>();
-        List<DownloadFile> downloadItems = new List<DownloadFile>();
+        List<DownloadableFile> files = new List<DownloadableFile>();
+        List<DownloadFile> downloads = new List<DownloadFile>();
 
         public MainWindow()
         {
             InitializeComponent();
 
-            FileList.ItemsSource = fileItems;
-            DownloadList.ItemsSource = downloadItems;
+            FileList.ItemsSource = files;
+            DownloadList.ItemsSource = downloads;
         }
 
         private void ListView_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -57,7 +57,7 @@ namespace Client
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (lockObj)
+            lock (locker)
             {
                 if (connectToMainServerThread == null)
                 {
@@ -75,19 +75,18 @@ namespace Client
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (lockObj)
+            lock (locker)
             {
-                if (connectToMainServerThread != null)
-                {
-                    client.Close();
-                    connectToMainServerThread.Abort();
+                client?.Close();
+                client = null;
 
-                    client = null;
-                    connectToMainServerThread = null;
-                }
+                connectToMainServerThread?.Abort();
+                connectToMainServerThread = null;
 
-                fileItems.Clear();
-                downloadItems.Clear();
+                files.Clear();
+                downloads.Clear();
+
+                MessageBox.Show("Client close", "Close");
             }
         }
 
@@ -98,70 +97,62 @@ namespace Client
 
         private void connectToMainServer(IPEndPoint serverIPEndPoint)
         {
-            client = new TcpClient(AddressFamily.InterNetworkV6);
-            client.Connect(serverIPEndPoint);
-            MyStreamIO myStream = new MyStreamIO(client.GetStream());
-            myStream.Write("<isClient>");
-            myStream.GetNEXT();
-
-            while (true)
+            try
             {
-                myStream.Write("<getAllFileInfo>");
-                int numberOfFileServer = myStream.ReadInt();
-                myStream.SendNEXT();
-                lock (lockObj)
+                client = new TcpClient(AddressFamily.InterNetworkV6);
+                client.Connect(serverIPEndPoint);
+                MyStreamIO myStream = new MyStreamIO(client.GetStream());
+                myStream.Write("<isClient>");
+                myStream.GetNEXT();
+
+                while (true)
                 {
-                    fileItems.Clear();
-
-                    for (int i = 0; i < numberOfFileServer; i++)
+                    myStream.Write("<getAllFileInfo>");
+                    int numberOfFileServer = myStream.ReadInt();
+                    myStream.SendNEXT();
+                    lock (locker)
                     {
-                        int numberOfFile = myStream.ReadInt();
-                        myStream.SendNEXT();
+                        files.Clear();
 
-                        for (int j = 0; j < numberOfFile; j++)
+                        for (int i = 0; i < numberOfFileServer; i++)
                         {
-                            string fileName = myStream.ReadString();
+                            int numberOfFile = myStream.ReadInt();
                             myStream.SendNEXT();
 
-                            long fileSize = myStream.ReadLong();
-                            myStream.SendNEXT();
+                            for (int j = 0; j < numberOfFile; j++)
+                            {
+                                string fileName = myStream.ReadString();
+                                myStream.SendNEXT();
 
-                            string ip = myStream.ReadString();
-                            myStream.SendNEXT();
+                                long fileSize = myStream.ReadLong();
+                                myStream.SendNEXT();
 
-                            int port = myStream.ReadInt();
-                            myStream.SendNEXT();
+                                string ip = myStream.ReadString();
+                                myStream.SendNEXT();
 
-                            fileItems.Add(new DownloadableFile(fileName, fileSize, ip, port));
+                                int port = myStream.ReadInt();
+                                myStream.SendNEXT();
+
+                                files.Add(new DownloadableFile(fileName, fileSize, ip, port));
+                            }
                         }
+
+                        UpdateItemList();
                     }
 
-                    UpdateItemList();
+                    Thread.Sleep(5000);
                 }
+            }
+            catch (Exception)
+            {
 
-                Thread.Sleep(5000);
             }
         }
 
         private IPEndPoint GetServerIP()
         {
-            IPAddress address;
-            int port = int.Parse(MainServerPort.Text);
-
-
-            if (MainServerIP.Text == "localhost")
-            {
-                IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
-                address = hostEntry.AddressList[0];
-            }
-            else
-            {
-                address = IPAddress.Parse(MainServerIP.Text);
-            }
-
-
-            IPEndPoint IP = new IPEndPoint(address, port);
-            return IP;
+            IPEndPoint serverIP = IPBuilder.GetIP(MainServerIP.Text, int.Parse(MainServerPort.Text));
+            return serverIP;
         }
 
         public void UpdateItemList()
@@ -183,40 +174,47 @@ namespace Client
 
         private void Download(DownloadableFile file)
         {
-            TcpClient client = new TcpClient(IPBuilder.GetIP());
-            IPEndPoint serverIP = IPBuilder.GetIP(file.IP, file.Port);
-
-            client.Connect(serverIP);
-
-            MyStreamIO myStream = new MyStreamIO(client.GetStream());
-
-            myStream.Write("<isClient>");
-            myStream.GetNEXT();
-
-            myStream.Write(file.FileName);
-            string rely = myStream.ReadString();
-
-            if(rely != "<fileFound>")
+            try
             {
+                TcpClient client = new TcpClient(IPBuilder.GetIP());
+                IPEndPoint serverIP = IPBuilder.GetIP(file.IP, file.Port);
+
+                client.Connect(serverIP);
+
+                MyStreamIO myStream = new MyStreamIO(client.GetStream());
+
+                myStream.Write("<isClient>");
+                myStream.GetNEXT();
+
+                myStream.Write(file.FileName);
+                string rely = myStream.ReadString();
+
+                if (rely != "<fileFound>")
+                {
+                    client.Close();
+                    return;
+                }
+
+                IPEndPoint udpClientIP = IPBuilder.GetIP();
+                UdpClient udpClient = new UdpClient(udpClientIP);
+
+
+                myStream.Write(udpClientIP.Address.ToString());
+                string udpListenerIP = myStream.ReadString();
+
+                myStream.Write(udpClientIP.Port);
+                int udpListenerPort = myStream.ReadInt();
+
                 client.Close();
-                return;
+
+                UdpDownload(udpClient, IPBuilder.GetIP(udpListenerIP, udpListenerPort), file);
+
+                udpClient.Close();
             }
+            catch (Exception)
+            {
 
-            IPEndPoint udpClientIP = IPBuilder.GetIP();
-            UdpClient udpClient = new UdpClient(udpClientIP);
-
-
-            myStream.Write(udpClientIP.Address.ToString());
-            string udpListenerIP = myStream.ReadString();
-
-            myStream.Write(udpClientIP.Port);
-            int udpListenerPort = myStream.ReadInt();
-
-            client.Close();
-
-            UdpDownload(udpClient, IPBuilder.GetIP(udpListenerIP, udpListenerPort), file);
-
-            udpClient.Close();
+            }
 
         }
 
@@ -262,9 +260,9 @@ namespace Client
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                string x = e.Message;                
+                
             }
 
         }

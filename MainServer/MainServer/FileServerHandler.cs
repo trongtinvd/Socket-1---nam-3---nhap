@@ -9,7 +9,7 @@ namespace MainServer
 {
     internal class FileServerHandler
     {
-        private object lockObj = new object();
+        private object locker = new object();
 
         private Thread workingWithFileServerThread;
         private MyStreamIO myStream;
@@ -21,29 +21,22 @@ namespace MainServer
         {
             get
             {
-                lock (lockObj)
+                lock (locker)
                 {
                     return _files;
                 }
             }
             set
             {
-                lock (lockObj)
+                lock (locker)
                 {
                     _files = value;
                 }
             }
         }
 
-        public string IP
-        {
-            get => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
-        }
-
-        public int Port
-        {
-            get => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
-        }
+        public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
+        public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
 
 
 
@@ -52,7 +45,7 @@ namespace MainServer
 
         public FileServerHandler(TcpClient client)
         {
-            lock (lockObj)
+            lock (locker)
             {
                 this.Client = client;
                 myStream = new MyStreamIO(client.GetStream());
@@ -86,6 +79,7 @@ namespace MainServer
         {
             try
             {
+                client.ReceiveTimeout = 7000;
                 while (true)
                 {
                     string request = myStream.ReadString();
@@ -94,7 +88,7 @@ namespace MainServer
                     switch (request)
                     {
                         case "<sendFilesInfo>":
-                            lock (lockObj)
+                            lock (locker)
                             {
                                 Files.Clear();
                                 int number0fFile = myStream.ReadInt();
@@ -119,13 +113,14 @@ namespace MainServer
 
                             }
                             break;
-
-                        default:
-                            throw new Exception("Error communicate with file server");
                     }
                 }
             }
-            catch (Exception e)
+            catch (TimeoutException)
+            {
+                Files.Clear();
+            }
+            catch (Exception)
             {
 
             }

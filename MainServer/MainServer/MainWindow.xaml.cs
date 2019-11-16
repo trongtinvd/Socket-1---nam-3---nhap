@@ -25,30 +25,30 @@ namespace MainServer
     /// </summary>
     public partial class MainWindow : Window
     {
-        object lockObject = new object();
+        object locker = new object();
 
         TcpListener Listener;
         Thread startServerThread;
 
-        List<FileServerHandler> fileServersItem = new List<FileServerHandler>();
-        List<ClientHandler> clientsItem = new List<ClientHandler>();
+        List<FileServerHandler> fileServers = new List<FileServerHandler>();
+        List<ClientHandler> clients = new List<ClientHandler>();
 
         public MainWindow()
         {
             InitializeComponent();
             
-            FileServerList.ItemsSource = fileServersItem;
-            ClientList.ItemsSource = clientsItem;
+            FileServerList.ItemsSource = fileServers;
+            ClientList.ItemsSource = clients;
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (lockObject)
+            lock (locker)
             {
                 if (startServerThread == null)
                 {
-                    IPEndPoint IP = GetServerIP();
-                    startServerThread = new Thread(() => StartServer(IP));
+                    IPEndPoint mainServerIP = IPBuilder.GetIP(MainServerIP.Text, int.Parse(MainServerPort.Text));
+                    startServerThread = new Thread(() => StartServer(mainServerIP));
                     startServerThread.Start();
                     MessageBox.Show("Your server has started.", "Main server: Server is started");
                 }
@@ -61,7 +61,7 @@ namespace MainServer
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (lockObject)
+            lock (locker)
             {
                 if (startServerThread != null)
                 {
@@ -72,13 +72,13 @@ namespace MainServer
                     startServerThread = null;
                 }
 
-                foreach(FileServerHandler handler in fileServersItem)
+                foreach(FileServerHandler handler in fileServers)
                 {
                     handler.Stop();
                 }
 
-                fileServersItem.Clear();
-                clientsItem.Clear();
+                fileServers.Clear();
+                clients.Clear();
                 UpdateItemList();
             }
         }
@@ -96,11 +96,11 @@ namespace MainServer
             gView.Columns[1].Width = workingWidth * col2;
         }
 
-        private void StartServer(IPEndPoint localEP)
+        private void StartServer(IPEndPoint serverIP)
         {
             try
             {
-                Listener = new TcpListener(localEP);
+                Listener = new TcpListener(serverIP);
                 Listener.Start();
 
 
@@ -114,13 +114,13 @@ namespace MainServer
                     if (firstMessage == "<isFileServer>")
                     {
                         FileServerHandler handler = new FileServerHandler(client);
-                        fileServersItem.Add(handler);
+                        fileServers.Add(handler);
                         handler.Start();
                     }
                     else if (firstMessage == "<isClient>")
                     {
-                        ClientHandler handler = new ClientHandler(client, fileServersItem);
-                        clientsItem.Add(handler);
+                        ClientHandler handler = new ClientHandler(client, fileServers);
+                        this.clients.Add(handler);
                         handler.Start();
                     }
 
@@ -128,7 +128,7 @@ namespace MainServer
                 }
 
             }
-            catch (ThreadAbortException e)
+            catch (ThreadAbortException)
             {
                 MessageBox.Show("Your server has closed.", "Main server: Server closed");
             }
@@ -136,27 +136,6 @@ namespace MainServer
             {
                 MessageBox.Show(e.Message, "Main server: " + e.ToString());
             }
-        }
-
-        private IPEndPoint GetServerIP()
-        {
-            IPAddress address;
-            int port = int.Parse(MainServerPort.Text);
-
-
-            if (MainServerIP.Text == "localhost")
-            {
-                IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
-                address = hostEntry.AddressList[0];
-            }
-            else
-            {
-                address = IPAddress.Parse(MainServerIP.Text);
-            }
-
-
-            IPEndPoint IP = new IPEndPoint(address, port);
-            return IP;
         }
 
         private void Window_Closed(object sender, EventArgs e)

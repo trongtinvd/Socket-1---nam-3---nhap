@@ -76,5 +76,10 @@ namespace MainServer
             else
                 throw new Exception("Error in communicate between main server and file server.\nMessage received: " + message);
         }
+
+        public void Stop()
+        {
+            stream.Close();
+        }
     }
 }

@@ -10,12 +10,12 @@ namespace FileServer
 {
     internal class ClientHandler
     {
-        private TcpClient client;
         private List<MyFile> fileList;
-        private Thread workWithClientThread;
         private MyStreamIO myStream;
         private IPEndPoint udpListenerIP;
         private UdpClient udpListener;
+        private TcpClient client;
+        private Thread workWithClientThread;
 
         public ClientHandler(TcpClient client, List<MyFile> fileList)
         {
@@ -28,6 +28,22 @@ namespace FileServer
         {
             workWithClientThread = new Thread(workWithClient);
             workWithClientThread.Start();
+        }
+
+        public void Stop()
+        {
+            myStream?.Stop();
+            myStream = null;
+
+            udpListener?.Close();
+            udpListener = null;
+
+            client?.Close();
+            client = null;
+
+            workWithClientThread?.Abort();
+            workWithClientThread = null;
+
         }
 
         private void workWithClient()
@@ -89,35 +105,42 @@ namespace FileServer
                 bool sendSuccess;
                 int size;
 
-                //udpListener.Client.ReceiveTimeout = 5000;
-                while ((size = file.Read(buffer, 0, buffer.Length)) > 0)
+                try
                 {
-                    string data = Encoding.UTF8.GetString(buffer);
-                    string hash = MyMD5Hash.GetMd5Hash(buffer);
-                    byte[] hashBuffer = Encoding.UTF8.GetBytes(hash);
-
-                    do
+                    //udpListener.Client.ReceiveTimeout = 5000;
+                    while ((size = file.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        udpListener.Send(hashBuffer, hashBuffer.Length, udpClientIP);
-                        udpListener.Send(buffer, size, udpClientIP);
+                        string data = Encoding.UTF8.GetString(buffer);
+                        string hash = MyMD5Hash.GetMd5Hash(buffer);
+                        byte[] hashBuffer = Encoding.UTF8.GetBytes(hash);
 
-                        try
+                        do
                         {
-                            relyBuffer = udpListener.Receive(ref udpClientIP);
-                            string rely = Encoding.UTF8.GetString(relyBuffer);
+                            udpListener.Send(hashBuffer, hashBuffer.Length, udpClientIP);
+                            udpListener.Send(buffer, size, udpClientIP);
 
-                            if (rely == "<ok>")
-                                sendSuccess = true;
-                            else
+                            try
+                            {
+                                relyBuffer = udpListener.Receive(ref udpClientIP);
+                                string rely = Encoding.UTF8.GetString(relyBuffer);
+
+                                if (rely == "<ok>")
+                                    sendSuccess = true;
+                                else
+                                    sendSuccess = false;
+
+                            }
+                            catch (TimeoutException e)
+                            {
                                 sendSuccess = false;
+                            }
 
-                        }
-                        catch (TimeoutException e)
-                        {
-                            sendSuccess = false;
-                        }
+                        } while (!sendSuccess);
 
-                    } while (!sendSuccess);
+                    }
+                }
+                catch
+                {
 
                 }
             }
@@ -128,7 +151,7 @@ namespace FileServer
         {
             if (client != null)
             {
-                client.Close();
+                this.Stop();
             }
         }
     }

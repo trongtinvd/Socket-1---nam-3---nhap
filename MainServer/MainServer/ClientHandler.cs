@@ -9,41 +9,26 @@ namespace MainServer
 {
     internal class ClientHandler
     {
-        private object lockObj = new object();
-        private List<FileServerHandler> fileServerItems;
+        private object locker = new object();
+        private List<FileServerHandler> fileServers;
         private Thread workingWithClientThread;
         private MyStreamIO myStream;
         public TcpClient Client { set; get; }
 
 
-        public string IP
+        public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
+        public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
+
+
+
+        public ClientHandler(TcpClient client, List<FileServerHandler> fileServers)
         {
-            get => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
-        }
-
-        public int Port
-        {
-            get => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
-        }
-
-
-
-
-
-
-        public ClientHandler(TcpClient client, List<FileServerHandler> fileServerItems)
-        {
-            lock (lockObj)
+            lock (locker)
             {
                 this.Client = client;
-                this.fileServerItems = fileServerItems;
+                this.fileServers = fileServers;
                 myStream = new MyStreamIO(client.GetStream());
             }
-        }
-
-        ~ClientHandler()
-        {
-            Stop();
         }
 
 
@@ -69,6 +54,7 @@ namespace MainServer
         {
             try
             {
+                client.ReceiveTimeout = 7000;
                 while (true)
                 {
                     string request = myStream.ReadString();
@@ -76,11 +62,11 @@ namespace MainServer
                     switch (request)
                     {
                         case "<getAllFileInfo>":
-                            myStream.Write(fileServerItems.Count);
+                            myStream.Write(fileServers.Count);
                             myStream.GetNEXT();
-                            foreach(FileServerHandler fileServer in fileServerItems)
+                            foreach (FileServerHandler fileServer in fileServers)
                             {
-                                List<MyFile> files = fileServer.Files;                                
+                                List<MyFile> files = fileServer.Files;
 
                                 myStream.Write(files.Count);
                                 myStream.GetNEXT();
@@ -92,7 +78,7 @@ namespace MainServer
                                     myStream.Write(file.Size);
                                     myStream.GetNEXT();
 
-                                    myStream.Write(file.IP);
+                                    myStream.Write(file.Address);
                                     myStream.GetNEXT();
 
                                     myStream.Write(file.Port);
@@ -101,17 +87,23 @@ namespace MainServer
                             }
 
                             break;
-
-
-                        default:
-                            throw new Exception("Error communicate with file server");
                     }
                 }
             }
-            catch(Exception e)
+            catch (TimeoutException)
+            {
+                
+            }
+            catch (Exception)
             {
 
             }
         }
+
+        ~ClientHandler()
+        {
+            this.Stop();
+        }
     }
+
 }
