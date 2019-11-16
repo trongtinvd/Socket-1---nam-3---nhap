@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -27,15 +28,20 @@ namespace FileServer
         TcpListener listener = null;
         TcpClient client = null;
 
-        object lockObject = new object();
-        string[] files;
+        IPEndPoint ipAsClient = IPBuilder.GetIP();
+        IPEndPoint ipAsServer = IPBuilder.GetIP();
+
+
+        object locker = new object();        
         MyStreamIO myStream;
 
         Thread connectToMainServerThread;
         Thread listenClientRequestThread;
 
-        List<ClientHandler> clientList = new List<ClientHandler>();
-        List<MyFile> fileList = new List<MyFile>();
+        List<ClientHandler> clientItems = new List<ClientHandler>();
+        List<MyFile> fileItems = new List<MyFile>();
+
+
 
         public MainWindow()
         {
@@ -43,10 +49,15 @@ namespace FileServer
 
             try
             {
-                FileList.ItemsSource = fileList;
-                ClientList.ItemsSource = clientList;
+                string[] files = Directory.GetFiles("./file/");
 
-                files = Directory.GetFiles("./file/");
+                foreach(string file in files)
+                {
+                    fileItems.Add(new MyFile(file));
+                }
+    
+                FileList.ItemsSource = fileItems;
+                ClientList.ItemsSource = clientItems;
             }
             catch (Exception e)
             {
@@ -69,18 +80,17 @@ namespace FileServer
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (lockObject)
+            lock (locker)
             {
                 if (listener == null && client == null)
                 {
                     IPEndPoint mainServerIP = GetMainServerIP();
-                    IPEndPoint thisServerIP = GetAnAvaibleIP();
 
                     connectToMainServerThread = new Thread(() => ConnectToMainServer(mainServerIP));
                     connectToMainServerThread.Start();
 
-                    //listenClientRequestThread = new Thread(() => ListenClientRequest(thisServerIP));
-                    //listenClientRequestThread.Start();
+                    listenClientRequestThread = new Thread(() => ListenClientRequest());
+                    listenClientRequestThread.Start();
 
                     MessageBox.Show("Your file server had started", "File server: File server started");
                 }
@@ -94,7 +104,7 @@ namespace FileServer
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (lockObject)
+            lock (locker)
             {
                 if (connectToMainServerThread != null)
                 {
@@ -116,40 +126,16 @@ namespace FileServer
 
         private IPEndPoint GetMainServerIP()
         {
-            IPAddress address;
-            int port = int.Parse(MainServerPort.Text);
-
-
-            if (MainServerIP.Text == "localhost")
-            {
-                IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
-                address = hostEntry.AddressList[0];
-            }
-            else
-            {
-                address = IPAddress.Parse(MainServerIP.Text);
-            }
-
-
-            IPEndPoint IP = new IPEndPoint(address, port);
-            return IP;
+            IPEndPoint ip = IPBuilder.GetIP(MainServerIP.Text, int.Parse(MainServerPort.Text));
+            return ip;
         }
 
-        private IPEndPoint GetAnAvaibleIP()
-        {
-            IPHostEntry hostEntry = Dns.GetHostEntry(Dns.GetHostName());
-            IPAddress address = hostEntry.AddressList[0];
-
-            IPEndPoint IP = new IPEndPoint(address, 0);
-            return IP;
-        }
-
-        private void ConnectToMainServer(IPEndPoint IP)
+        private void ConnectToMainServer(IPEndPoint serverIP)
         {
             try
             {
-                client = new TcpClient(AddressFamily.InterNetworkV6);
-                client.Connect(IP);
+                client = new TcpClient(ipAsClient);
+                client.Connect(serverIP);
 
                 myStream = new MyStreamIO(client.GetStream());
 
@@ -158,9 +144,8 @@ namespace FileServer
 
                 while (true)
                 {
-                    //work with main server.
 
-                    int numberOfFile = files.Length;
+                    int numberOfFile = fileItems.Count;
 
                     myStream.Write("<sendFilesInfo>");
                     myStream.GetNEXT();
@@ -168,12 +153,18 @@ namespace FileServer
                     myStream.Write(numberOfFile);
                     myStream.GetNEXT();
 
-                    foreach (string fileName in files)
+                    foreach (MyFile file in fileItems)
                     {
-                        myStream.Write(fileName);
+                        myStream.Write(file.FileName);
                         myStream.GetNEXT();
                         
-                        myStream.Write(new FileInfo(fileName).Length);
+                        myStream.Write(file.FileSize);
+                        myStream.GetNEXT();
+
+                        myStream.Write(ipAsServer.Address.ToString());
+                        myStream.GetNEXT();
+
+                        myStream.Write(ipAsServer.Port);
                         myStream.GetNEXT();
                     }
 
@@ -191,27 +182,36 @@ namespace FileServer
             }
         }
 
-        private void ListenClientRequest(IPEndPoint IP)
+        private void ListenClientRequest()
         {
+            listener = new TcpListener(ipAsServer);
+            listener.Start();
+
+            try
+            {
+                while (true)
+                {
+                    TcpClient client = listener.AcceptTcpClient();
+                    ClientHandler handle = new ClientHandler(client, fileItems);
+                    clientItems.Add(handle);
+                    handle.Start();
+                }
+
+            }
+            catch(ThreadAbortException e)
+            {
+
+            }
+            catch(Exception e)
+            {
+
+            }
 
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
             CloseButton_Click(sender, null);
-        }
-        private void ResponseToMainServer()
-        {
-            string response = myStream.ReadString();
-            switch (response)
-            {
-                case "<NEXT>":
-
-                    break;
-
-                default:
-                    throw new Exception("Error communicate with main server");
-            }
         }
     }
 }

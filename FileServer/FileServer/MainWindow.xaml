@@ -54,8 +54,8 @@
             <ListView Grid.Row="1" Name="FileList" SizeChanged="List_SizeChanged">
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>
-                        <GridViewColumn Header="Size" Width="150" DisplayMemberBinding="{Binding Size}"/>
+                        <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding FileName}"/>
+                        <GridViewColumn Header="Size" Width="150" DisplayMemberBinding="{Binding FileSize}"/>
                     </GridView>
                 </ListView.View>
             </ListView>

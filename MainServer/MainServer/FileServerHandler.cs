@@ -107,7 +107,13 @@ namespace MainServer
                                     long fileSize = myStream.ReadLong();
                                     myStream.SendNEXT();
 
-                                    MyFile file = new MyFile(fileName, fileSize);
+                                    string fileIp = myStream.ReadString();
+                                    myStream.SendNEXT();
+
+                                    int filePort = myStream.ReadInt();
+                                    myStream.SendNEXT();
+
+                                    MyFile file = new MyFile(fileName, fileSize, fileIp, filePort);
                                     Files.Add(file);
                                 }
 

@@ -8,6 +8,9 @@ namespace MainServer
 {
     class MyFile
     {
+        public string IP { get; }
+        public int Port { get; }
+
         public string Name { get; }
         public long Size { get; }        
 
@@ -17,5 +20,10 @@ namespace MainServer
             this.Size = size;
         }
 
+        public MyFile(string name, long size, string ip, int port) : this(name, size)
+        {
+            this.IP = ip;
+            this.Port = port;
+        }
     }
 }

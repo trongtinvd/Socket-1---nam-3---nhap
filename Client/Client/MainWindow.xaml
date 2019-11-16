@@ -58,7 +58,7 @@
                         <GridViewColumn Width="20">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="↓"/>
+                                    <Button Content="↓" HorizontalAlignment="Stretch" Click="DownloadButton_Click"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>

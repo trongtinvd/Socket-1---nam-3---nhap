@@ -80,14 +80,7 @@ namespace MainServer
                             myStream.GetNEXT();
                             foreach(FileServerHandler fileServer in fileServerItems)
                             {
-                                string ip = fileServer.IP;
-                                int port = fileServer.Port;
-                                List<MyFile> files = fileServer.Files;
-
-                                myStream.Write(ip);
-                                myStream.GetNEXT();
-                                myStream.Write(port);
-                                myStream.GetNEXT();
+                                List<MyFile> files = fileServer.Files;                                
 
                                 myStream.Write(files.Count);
                                 myStream.GetNEXT();
@@ -95,7 +88,14 @@ namespace MainServer
                                 {
                                     myStream.Write(file.Name);
                                     myStream.GetNEXT();
+
                                     myStream.Write(file.Size);
+                                    myStream.GetNEXT();
+
+                                    myStream.Write(file.IP);
+                                    myStream.GetNEXT();
+
+                                    myStream.Write(file.Port);
                                     myStream.GetNEXT();
                                 }
                             }

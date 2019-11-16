@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -114,10 +115,6 @@ namespace Client
 
                     for (int i = 0; i < numberOfFileServer; i++)
                     {
-                        string ip = myStream.ReadString();
-                        myStream.SendNEXT();
-                        int port = myStream.ReadInt();
-                        myStream.SendNEXT();
                         int numberOfFile = myStream.ReadInt();
                         myStream.SendNEXT();
 
@@ -125,7 +122,14 @@ namespace Client
                         {
                             string fileName = myStream.ReadString();
                             myStream.SendNEXT();
+
                             long fileSize = myStream.ReadLong();
+                            myStream.SendNEXT();
+
+                            string ip = myStream.ReadString();
+                            myStream.SendNEXT();
+
+                            int port = myStream.ReadInt();
                             myStream.SendNEXT();
 
                             fileItems.Add(new DownloadableFile(fileName, fileSize, ip, port));
@@ -167,6 +171,95 @@ namespace Client
                 FileList.Items.Refresh();
                 DownloadList.Items.Refresh();
             });
+        }
+
+        private void DownloadButton_Click(object sender, RoutedEventArgs e)
+        {
+            DownloadableFile file = (sender as Button).DataContext as DownloadableFile;
+
+            Thread downloadThread = new Thread(() => Download(file));
+            downloadThread.Start();
+        }
+
+        private void Download(DownloadableFile file)
+        {
+            TcpClient client = new TcpClient(IPBuilder.GetIP());
+            IPEndPoint serverIP = IPBuilder.GetIP(file.IP, file.Port);
+
+            client.Connect(serverIP);
+
+            MyStreamIO myStream = new MyStreamIO(client.GetStream());
+
+            myStream.Write("<isClient>");
+            myStream.GetNEXT();
+
+            myStream.Write(file.FileName);
+            string rely = myStream.ReadString();
+
+            if(rely != "<fileFound>")
+            {
+                client.Close();
+                return;
+            }
+
+            IPEndPoint udpClientIP = IPBuilder.GetIP();
+            UdpClient udpClient = new UdpClient(udpClientIP);
+
+
+            myStream.Write(udpClientIP.Address.ToString());
+            string udpListenerIP = myStream.ReadString();
+
+            myStream.Write(udpClientIP.Port);
+            int udpListenerPort = myStream.ReadInt();
+
+            client.Close();
+
+            UdpDownload(udpClient, IPBuilder.GetIP(udpListenerIP, udpListenerPort), file);
+
+            udpClient.Close();
+
+        }
+
+        private void UdpDownload(UdpClient udpClient, IPEndPoint udpListenerIP, DownloadableFile file)
+        {
+            byte[] hashBuffer;
+            byte[] dataBuffer;
+            byte[] messageBuffer;
+            long filesize = file.FileSize;
+            long received = 0;
+
+
+            byte[] relyBuffer = udpClient.Receive(ref udpListenerIP);
+
+            messageBuffer = Encoding.UTF8.GetBytes("<ok>");
+            udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
+
+            using (FileStream newFile = File.OpenWrite(file.ShortenFileName))
+            {
+                while (received < filesize)
+                {
+                    hashBuffer = udpClient.Receive(ref udpListenerIP);
+                    dataBuffer = udpClient.Receive(ref udpListenerIP);
+
+                    string hash = Encoding.UTF8.GetString(hashBuffer);
+                    string data = Encoding.UTF8.GetString(dataBuffer);
+
+                    if(MyMD5Hash.VerifyMd5Hash(data, hash) == false)
+                    {
+                        messageBuffer = Encoding.UTF8.GetBytes("<error>");
+                        udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
+                        continue;
+                    }
+
+                    messageBuffer = Encoding.UTF8.GetBytes("<ok>");
+                    udpClient.Send(messageBuffer, messageBuffer.Length, udpListenerIP);
+
+                    newFile.Write(dataBuffer, 0, dataBuffer.Length);
+                    received += dataBuffer.Length;
+
+                }
+            }
+
         }
     }
 }
