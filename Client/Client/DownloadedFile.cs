@@ -8,6 +8,13 @@ namespace Client
 {
     class DownloadedFile
     {
+        public string Name { get; set; }
+        public string Status { get; set; }
 
+        public DownloadedFile(string name, string status)
+        {
+            this.Name = name;
+            this.Status = status;
+        }
     }
 }

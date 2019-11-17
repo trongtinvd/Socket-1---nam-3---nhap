@@ -9,6 +9,9 @@ namespace FileServer
 {
     static class MyMD5Hash
     {
+        private static object hashLocker = new object();
+        private static object verifyLocker = new object();
+
         public static MD5 md5Hash;
 
         static MyMD5Hash()
@@ -20,63 +23,75 @@ namespace FileServer
         public static string GetMd5Hash(string input)
         {
 
-            byte[] data = md5Hash.ComputeHash(Encoding.UTF8.GetBytes(input));
-
-            StringBuilder sBuilder = new StringBuilder();
-
-            for (int i = 0; i < data.Length; i++)
+            lock (hashLocker)
             {
-                sBuilder.Append(data[i].ToString("x2"));
-            }
+                byte[] data = md5Hash.ComputeHash(Encoding.UTF8.GetBytes(input));
 
-            return sBuilder.ToString();
+                StringBuilder sBuilder = new StringBuilder();
+
+                for (int i = 0; i < data.Length; i++)
+                {
+                    sBuilder.Append(data[i].ToString("x2"));
+                }
+
+                return sBuilder.ToString();
+            }
         }
 
 
         public static string GetMd5Hash(byte[] input)
         {
 
-            byte[] data = md5Hash.ComputeHash(input);
-
-            StringBuilder sBuilder = new StringBuilder();
-
-            for (int i = 0; i < data.Length; i++)
+            lock (hashLocker)
             {
-                sBuilder.Append(data[i].ToString("x2"));
-            }
+                byte[] data = md5Hash.ComputeHash(input);
 
-            return sBuilder.ToString();
+                StringBuilder sBuilder = new StringBuilder();
+
+                for (int i = 0; i < data.Length; i++)
+                {
+                    sBuilder.Append(data[i].ToString("x2"));
+                }
+
+                return sBuilder.ToString();
+            }
         }
 
         public static bool VerifyMd5Hash(string input, string hash)
         {
-            string hashOfInput = GetMd5Hash(input);
-
-            StringComparer comparer = StringComparer.OrdinalIgnoreCase;
-
-            if (0 == comparer.Compare(hashOfInput, hash))
+            lock (verifyLocker)
             {
-                return true;
-            }
-            else
-            {
-                return false;
+                string hashOfInput = GetMd5Hash(input);
+
+                StringComparer comparer = StringComparer.OrdinalIgnoreCase;
+
+                if (0 == comparer.Compare(hashOfInput, hash))
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
         }
 
         public static bool VerifyMd5Hash(byte[] input, string hash)
         {
-            string hashOfInput = GetMd5Hash(input);
-
-            StringComparer comparer = StringComparer.OrdinalIgnoreCase;
-
-            if (0 == comparer.Compare(hashOfInput, hash))
+            lock (verifyLocker)
             {
-                return true;
-            }
-            else
-            {
-                return false;
+                string hashOfInput = GetMd5Hash(input);
+
+                StringComparer comparer = StringComparer.OrdinalIgnoreCase;
+
+                if (0 == comparer.Compare(hashOfInput, hash))
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
         }
     }

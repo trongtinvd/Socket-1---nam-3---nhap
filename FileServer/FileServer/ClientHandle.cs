@@ -9,17 +9,17 @@ using System.Windows;
 
 namespace FileServer
 {
-    internal class ClientHandler
+    public class ClientHandler
     {
         private object locker = new object();
         private MyStreamIO myStream;
         private IPEndPoint udpListenerIP;
         private UdpClient udpListener;
         private Thread workWithClientThread;
-        private TcpClient Client { get; }
+        private TcpClient Client { get; set; }
 
-        public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
-        public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
+        public string Address => (Client != null) ? ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString() : "";
+        public int Port => (Client != null) ? ((IPEndPoint)Client.Client.RemoteEndPoint).Port : 0;
 
         public ClientHandler(TcpClient client)
         {
@@ -50,18 +50,22 @@ namespace FileServer
                     udpListener?.Close();
                     udpListener = null;
 
-                    Client?.GetStream()?.Close();
                     Client?.Close();
+                    Client = null;
 
                     workWithClientThread?.Abort();
                     workWithClientThread = null;
 
-                    ListHolder.Clients.Remove(this);
-                    ListHolder.UpdateList();
+                    MyDispatcher.Dispatcher.Invoke(() =>
+                    {
+                        ListHolder.Clients.Remove(this);
+                        ListHolder.UpdateList();
+                    });
+
                 }
                 catch (Exception)
                 {
-                    
+
                 }
             }
         }
@@ -70,6 +74,8 @@ namespace FileServer
         {
             try
             {
+                Client.Client.ReceiveTimeout = 7000;
+                Client.Client.SendTimeout = 7000;
                 string firstMessage = myStream.ReadString();
                 myStream.SendNEXT();
 
@@ -112,13 +118,14 @@ namespace FileServer
                     MessageBox.Show(e.Message, "File server error: when initial sending file");
                 });
             }
-
-            this.Stop();
         }
 
         private void SendFile(string fileName, IPEndPoint udpClientIP)
         {
             string fileSize = new FileInfo(fileName).Length.ToString();
+            //udpListener.Client.ReceiveTimeout = 7000;
+            //udpListener.Client.SendTimeout = 7000;
+
 
             byte[] messageBuffer = Encoding.UTF8.GetBytes(fileSize);
             udpListener.Send(messageBuffer, messageBuffer.Length, udpClientIP);
@@ -128,26 +135,30 @@ namespace FileServer
 
             using (FileStream file = File.OpenRead(fileName))
             {
-                byte[] buffer = new byte[1024];
+                byte[] dataBuffer = new byte[1024];
                 byte[] relyBuffer;
                 bool sendSuccess;
                 int size;
 
                 try
                 {
-                    //udpListener.Client.ReceiveTimeout = 5000;
+
                     lock (locker)
                     {
-                        while ((size = file.Read(buffer, 0, buffer.Length)) > 0)
+                        while ((size = file.Read(dataBuffer, 0, dataBuffer.Length)) > 0)
                         {
-                            string data = Encoding.UTF8.GetString(buffer);
-                            string hash = MyMD5Hash.GetMd5Hash(buffer);
+                            string data = Encoding.UTF8.GetString(dataBuffer);
+
+                            byte[] copyBuffer = new byte[size];
+                            Array.Copy(dataBuffer, copyBuffer, size);
+
+                            string hash = MyMD5Hash.GetMd5Hash(copyBuffer);
                             byte[] hashBuffer = Encoding.UTF8.GetBytes(hash);
 
                             do
                             {
                                 udpListener.Send(hashBuffer, hashBuffer.Length, udpClientIP);
-                                udpListener.Send(buffer, size, udpClientIP);
+                                udpListener.Send(dataBuffer, size, udpClientIP);
 
                                 try
                                 {

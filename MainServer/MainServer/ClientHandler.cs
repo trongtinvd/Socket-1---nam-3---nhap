@@ -13,10 +13,10 @@ namespace MainServer
         private object locker = new object();
         private Thread workingWithClientThread;
         private MyStreamIO myStream;
-        public TcpClient Client { get; }
+        public TcpClient Client { get; private set; }
 
-        public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
-        public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
+        public string Address => (Client != null) ? ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString() : "";
+        public int Port => (Client != null) ? ((IPEndPoint)Client.Client.RemoteEndPoint).Port : 0;
 
 
         public ClientHandler(TcpClient client)
@@ -43,9 +43,8 @@ namespace MainServer
         {
             lock (locker)
             {
-                Client?.GetStream()?.Close();
                 Client?.Close();
-                //Client?.Dispose();
+                Client = null;
 
                 workingWithClientThread?.Abort();
                 workingWithClientThread = null;
@@ -57,6 +56,7 @@ namespace MainServer
             try
             {
                 client.ReceiveTimeout = 7000;
+                client.SendTimeout = 7000;
                 while (true)
                 {
                     string request = myStream.ReadString();

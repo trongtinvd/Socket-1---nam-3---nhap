@@ -50,14 +50,12 @@ namespace Client
             ListView listView = sender as ListView;
             GridView gView = listView.View as GridView;
 
-            var workingWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth - 10; // take into account vertical scrollbar
-            var col1 = 0.60;
-            var col2 = 0.20;
-            var col3 = 0.20;
+            var workingWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth - 10;
+            var col1 = 0.65;
+            var col2 = 0.30;
 
             gView.Columns[0].Width = workingWidth * col1;
             gView.Columns[1].Width = workingWidth * col2;
-            gView.Columns[2].Width = workingWidth * col3;
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
@@ -79,16 +77,19 @@ namespace Client
         {
             lock (locker)
             {
-                client?.GetStream()?.Close();
-                client?.Close();
-                //client?.Dispose();
-                client = null;
+                if (client != null)
+                {
+                    if (client.Connected)
+                        client?.GetStream()?.Close();
+                    client?.Close();
+                    client = null;
+                }
 
                 connectToMainServerThread?.Abort();
                 connectToMainServerThread = null;
 
                 ListHolder.DownloadableFiles.Clear();
-                //ListHolder.DownloadedFiles.Clear();
+                ListHolder.UpdateList();
 
                 MessageBox.Show("Client close", "Close");
             }
@@ -112,6 +113,7 @@ namespace Client
 
 
                 client.ReceiveTimeout = 7000;
+                client.SendTimeout = 7000;
                 while (true)
                 {
                     lock (locker)
@@ -150,14 +152,9 @@ namespace Client
                     Thread.Sleep(5000);
                 }
             }
-            catch(TimeoutException)
-            {
-
-            }
             catch (ThreadAbortException)
             {
-                client?.GetStream()?.Close();
-                client?.Close();
+
             }
             catch (Exception e)
             {
@@ -170,15 +167,6 @@ namespace Client
             IPEndPoint serverIP = IPBuilder.GetIP(MainServerIP.Text, int.Parse(MainServerPort.Text));
             return serverIP;
         }
-
-        //public void UpdateItemList()
-        //{
-        //    this.Dispatcher.Invoke(() =>
-        //    {
-        //        FileList.Items.Refresh();
-        //        DownloadList.Items.Refresh();
-        //    });
-        //}
 
         private void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
@@ -195,6 +183,8 @@ namespace Client
                 IPEndPoint serverIP = IPBuilder.GetIP(file.IP, file.Port);
 
                 client.Connect(serverIP);
+                client.Client.ReceiveTimeout = 7000;
+                client.Client.SendTimeout = 7000;
 
                 MyStreamIO myStream = new MyStreamIO(client.GetStream());
 
@@ -228,10 +218,6 @@ namespace Client
 
                 udpClient.Close();
             }
-            catch (ThreadAbortException)
-            {
-
-            }
             catch (Exception e)
             {
                 MessageBox.Show(e.Message, "Client error: when getting file info for download from file server");
@@ -247,7 +233,12 @@ namespace Client
             long filesize = file.FileSize;
             long received = 0;
 
+            DownloadedFile newFileInfo = new DownloadedFile(file.FileName, "Downloading...");
+            ListHolder.DownloadedFiles.Add(newFileInfo);
+            ListHolder.UpdateList();
 
+            //udpClient.Client.ReceiveTimeout = 7000;
+            //udpClient.Client.SendTimeout = 7000;
             try
             {
                 byte[] relyBuffer = udpClient.Receive(ref udpListenerIP);
@@ -261,7 +252,7 @@ namespace Client
                     {
                         hashBuffer = udpClient.Receive(ref udpListenerIP);
                         dataBuffer = udpClient.Receive(ref udpListenerIP);
-
+                        
                         string hash = Encoding.UTF8.GetString(hashBuffer);
                         string data = Encoding.UTF8.GetString(dataBuffer);
 
@@ -280,10 +271,21 @@ namespace Client
 
                     }
                 }
+
+                udpClient.Close();
+                newFileInfo.Status = "Finish";
+                ListHolder.UpdateList();
+
+                MyDispatcher.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show("finish download file: " + file.FileName);
+                });
             }
             catch (Exception e)
             {
                 MessageBox.Show(e.Message, "Client error: when download file from file server");
+                newFileInfo.Status = "Download error";
+                ListHolder.UpdateList();
             }
 
         }

@@ -14,13 +14,12 @@ namespace MainServer
 
         private Thread workingWithFileServerThread;
         private MyStreamIO myStream;
-        //private List<MyFile> _files;
 
-        public TcpClient Client { get; }
+        public TcpClient Client { get; private set; }
         public List<MyFile> Files { get; } = new List<MyFile>();
 
-        public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
-        public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
+        public string Address => (Client != null) ? ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString() : "";
+        public int Port => (Client != null) ? ((IPEndPoint)Client.Client.RemoteEndPoint).Port : 0;
 
 
         public FileServerHandler(TcpClient client)
@@ -47,9 +46,8 @@ namespace MainServer
         {
             lock (locker)
             {
-                Client?.GetStream()?.Close();
                 Client?.Close();
-                //Client?.Dispose();
+                Client = null;
 
                 workingWithFileServerThread?.Abort();
                 workingWithFileServerThread = null;
@@ -61,6 +59,7 @@ namespace MainServer
             try
             {
                 client.ReceiveTimeout = 7000;
+                client.SendTimeout = 7000;
                 while (true)
                 {
                     string request = myStream.ReadString();

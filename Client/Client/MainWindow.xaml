@@ -79,8 +79,7 @@
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>
-                        <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
-                        <GridViewColumn Header="%" Width="50" DisplayMemberBinding="{Binding Percentage}"/>
+                        <GridViewColumn Header="Status" Width="100" DisplayMemberBinding="{Binding Status}"/>
                     </GridView>
                 </ListView.View>
             </ListView>

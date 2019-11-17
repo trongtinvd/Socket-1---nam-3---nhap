@@ -85,8 +85,8 @@ namespace MainServer
                     handler.Stop();
                 }
 
-                //ListHolder.FileServers.Clear();
-                //ListHolder.Clients.Clear();
+                ListHolder.FileServers.Clear();
+                ListHolder.Clients.Clear();
                 ListHolder.UpdateList();
                 MessageBox.Show("Your server has closed.", "Main server: Server closed");
             }
@@ -118,7 +118,7 @@ namespace MainServer
                 Listener = new TcpListener(serverIP);
                 Listener.Start();
 
-
+                
                 while (true)
                 {
                     TcpClient client = Listener.AcceptTcpClient();
@@ -157,14 +157,5 @@ namespace MainServer
         {
             CloseButton_Click(this, null);
         }
-
-        //public void UpdateItemList()
-        //{
-        //    this.Dispatcher.Invoke(() =>
-        //    {
-        //        FileServerList.Items.Refresh();
-        //        ClientList.Items.Refresh();
-        //    });
-        //}
     }
 }
