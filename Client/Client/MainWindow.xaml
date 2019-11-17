@@ -50,7 +50,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Available file for download:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="FileList" SizeChanged="ListView_SizeChanged">
+            <ListView Grid.Row="1" Name="DownloadableFileList" SizeChanged="ListView_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding FileName}"/>
@@ -75,7 +75,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Downloading:" VerticalAlignment="Center"/>
-            <ListView Grid.Row="1" Name="DownloadList" SizeChanged="ListView_SizeChanged">
+            <ListView Grid.Row="1" Name="DownloadedFileList" SizeChanged="ListView_SizeChanged">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="File name" Width="150" DisplayMemberBinding="{Binding Name}"/>

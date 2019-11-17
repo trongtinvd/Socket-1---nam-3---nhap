@@ -64,6 +64,8 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="IPBuilder.cs" />
+    <Compile Include="ListHolder.cs" />
+    <Compile Include="MyDispatcher.cs" />
     <Compile Include="MyFile.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

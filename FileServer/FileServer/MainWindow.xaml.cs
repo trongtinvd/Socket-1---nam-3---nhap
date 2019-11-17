@@ -25,41 +25,45 @@ namespace FileServer
     /// </summary>
     public partial class MainWindow : Window
     {
+        object clientLocker = new object();
+        object serverLocker = new object();
         TcpListener listener = null;
-        TcpClient client = null;
+        TcpClient client = null;        
+        MyStreamIO myStream;
 
         IPEndPoint ipAsClient = IPBuilder.GetIP();
         IPEndPoint ipAsServer = IPBuilder.GetIP();
 
-
-        object locker = new object();        
-        MyStreamIO myStream;
-
         Thread connectToMainServerThread;
-        Thread listenClientRequestThread;
-
-        List<ClientHandler> clientItems = new List<ClientHandler>();
-        List<MyFile> fileItems = new List<MyFile>();
-            
+        Thread makeConnectToClientThread;
+                    
         public MainWindow()
         {
             InitializeComponent();
+
+            ListHolder.Clients = new List<ClientHandler>();
+            ListHolder.Files = new List<MyFile>();
+
+            ListHolder.ClientsList = ClientList;
+            ListHolder.FilesList = FileList;
+
+            ListHolder.ClientsList.ItemsSource = ListHolder.Clients;
+            ListHolder.FilesList.ItemsSource = ListHolder.Files;
+
+            MyDispatcher.Dispatcher = this.Dispatcher;
 
             try
             {
                 string[] files = Directory.GetFiles("./file/");
 
-                foreach(string file in files)
+                foreach (string file in files)
                 {
-                    fileItems.Add(new MyFile(file));
-                }
-    
-                FileList.ItemsSource = fileItems;
-                ClientList.ItemsSource = clientItems;
+                    ListHolder.Files.Add(new MyFile(file));
+                }    
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message, "File server - error initialize: " + e.ToString());
+                MessageBox.Show(e.Message, "File server error: when initialize");
             }
         }
 
@@ -78,8 +82,6 @@ namespace FileServer
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (locker)
-            {
                 if (listener == null && client == null)
                 {
                     IPEndPoint mainServerIP = GetMainServerIP();
@@ -87,8 +89,8 @@ namespace FileServer
                     connectToMainServerThread = new Thread(() => ConnectToMainServer(mainServerIP));
                     connectToMainServerThread.Start();
 
-                    listenClientRequestThread = new Thread(() => ListenClientRequest());
-                    listenClientRequestThread.Start();
+                    makeConnectToClientThread = new Thread(() => ListenClientRequest());
+                    makeConnectToClientThread.Start();
 
                     MessageBox.Show("Your file server had started", "File server: File server started");
                 }
@@ -96,35 +98,42 @@ namespace FileServer
                 {
                     MessageBox.Show("Your file server had already start.", "File server: Error");
                 }
-            }
-
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (locker)
+            //lock (clientLocker)
             {
+                //lock (serverLocker)
+                {
+                    client?.GetStream()?.Close();
+                    client?.Close();
+                    //client?.Dispose();
+                    client = null;
 
-                client?.Close();
-                client = null;
+                    connectToMainServerThread?.Abort();
+                    connectToMainServerThread = null;
 
-                connectToMainServerThread?.Abort();
-                connectToMainServerThread = null;
+                    listener?.Stop();
+                    //listener?.Server.Dispose();
+                    listener = null;
 
-                listener?.Stop();
-                listener = null;
+                    makeConnectToClientThread?.Abort();
+                    makeConnectToClientThread = null;
 
-                listenClientRequestThread?.Abort();
-                listenClientRequestThread = null;
-
-                MessageBox.Show("Your file server had stopped", "File server stop");
-
+                    foreach (ClientHandler handler in ListHolder.Clients)
+                    {
+                        handler.Stop();
+                    }
+                }
             }
+
+            MessageBox.Show("Your file server had stopped", "File server stop");
         }
 
         private IPEndPoint GetMainServerIP()
         {
-            IPEndPoint ip = IPBuilder.GetIP(MainServerIP.Text, int.Parse(MainServerPort.Text));
+            IPEndPoint ip = IPBuilder.GetIP(MainServerAddress.Text, int.Parse(MainServerPort.Text));
             return ip;
         }
 
@@ -142,28 +151,30 @@ namespace FileServer
 
                 while (true)
                 {
-
-                    int numberOfFile = fileItems.Count;
-
-                    myStream.Write("<sendFilesInfo>");
-                    myStream.GetNEXT();
-
-                    myStream.Write(numberOfFile);
-                    myStream.GetNEXT();
-
-                    foreach (MyFile file in fileItems)
+                    lock (clientLocker)
                     {
-                        myStream.Write(file.FileName);
-                        myStream.GetNEXT();
-                        
-                        myStream.Write(file.FileSize);
+                        int numberOfFile = ListHolder.Files.Count;
+
+                        myStream.Write("<sendFilesInfo>");
                         myStream.GetNEXT();
 
-                        myStream.Write(ipAsServer.Address.ToString());
+                        myStream.Write(numberOfFile);
                         myStream.GetNEXT();
 
-                        myStream.Write(ipAsServer.Port);
-                        myStream.GetNEXT();
+                        foreach (MyFile file in ListHolder.Files)
+                        {
+                            myStream.Write(file.FileName);
+                            myStream.GetNEXT();
+
+                            myStream.Write(file.FileSize);
+                            myStream.GetNEXT();
+
+                            myStream.Write(ipAsServer.Address.ToString());
+                            myStream.GetNEXT();
+
+                            myStream.Write(ipAsServer.Port);
+                            myStream.GetNEXT();
+                        } 
                     }
 
                     Thread.Sleep(5000);
@@ -176,7 +187,7 @@ namespace FileServer
             }
             catch (Exception e)
             {
-                MessageBox.Show("Error when working with main server\n" + e.Message,"File server: " + e.ToString());
+                MessageBox.Show(e.Message,"File server error: when working with main server");
             }
         }
 
@@ -189,15 +200,18 @@ namespace FileServer
             {
                 while (true)
                 {
-                    TcpClient client = listener.AcceptTcpClient();
-                    ClientHandler handle = new ClientHandler(client, fileItems);
-                    clientItems.Add(handle);
-                    handle.Start();
+                    lock (serverLocker)
+                    {
+                        TcpClient client = listener.AcceptTcpClient();
+                        ClientHandler handle = new ClientHandler(client);
+                        ListHolder.Clients.Add(handle);
+                        handle.Start(); 
+                    }
                 }
             }
-            catch
+            catch(Exception e)
             {
-
+                MessageBox.Show(e.Message, "File server error: when waiting for client connection");
             }
 
         }

@@ -28,28 +28,33 @@ namespace MainServer
         object locker = new object();
 
         TcpListener Listener;
-        Thread startServerThread;
-
-        List<FileServerHandler> fileServers = new List<FileServerHandler>();
-        List<ClientHandler> clients = new List<ClientHandler>();
+        Thread makeConnectionThread;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            ListHolder.FileServers = new List<FileServerHandler>();
+            ListHolder.Clients = new List<ClientHandler>();
+
+            ListHolder.FileServersList = FileServerList;
+            ListHolder.ClientsList = ClientList;
             
-            FileServerList.ItemsSource = fileServers;
-            ClientList.ItemsSource = clients;
+            ListHolder.FileServersList.ItemsSource = ListHolder.FileServers;
+            ListHolder.ClientsList.ItemsSource = ListHolder.Clients;
+
+            MyDispatcher.Dispatcher = this.Dispatcher;
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
             lock (locker)
             {
-                if (startServerThread == null)
+                if (makeConnectionThread == null)
                 {
-                    IPEndPoint mainServerIP = IPBuilder.GetIP(MainServerIP.Text, int.Parse(MainServerPort.Text));
-                    startServerThread = new Thread(() => StartServer(mainServerIP));
-                    startServerThread.Start();
+                    IPEndPoint mainServerIP = GetMainServerIP();
+                    makeConnectionThread = new Thread(() => MakeConnect(mainServerIP));
+                    makeConnectionThread.Start();
                     MessageBox.Show("Your server has started.", "Main server: Server is started");
                 }
                 else
@@ -63,24 +68,34 @@ namespace MainServer
         {
             lock (locker)
             {
-                if (startServerThread != null)
-                {
-                    Listener.Stop();
-                    startServerThread.Abort();
+                Listener?.Stop();
+                Listener = null;
 
-                    Listener = null;
-                    startServerThread = null;
-                }
+                makeConnectionThread?.Abort();
+                makeConnectionThread = null;
 
-                foreach(FileServerHandler handler in fileServers)
+
+                foreach (FileServerHandler handler in ListHolder.FileServers)
                 {
                     handler.Stop();
                 }
 
-                fileServers.Clear();
-                clients.Clear();
-                UpdateItemList();
+                foreach (ClientHandler handler in ListHolder.Clients)
+                {
+                    handler.Stop();
+                }
+
+                //ListHolder.FileServers.Clear();
+                //ListHolder.Clients.Clear();
+                ListHolder.UpdateList();
+                MessageBox.Show("Your server has closed.", "Main server: Server closed");
             }
+        }
+
+        private IPEndPoint GetMainServerIP()
+        {
+            IPEndPoint ip = IPBuilder.GetIP(MainServerAddress.Text, int.Parse(MainServerPort.Text));
+            return ip;
         }
 
         private void List_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -96,7 +111,7 @@ namespace MainServer
             gView.Columns[1].Width = workingWidth * col2;
         }
 
-        private void StartServer(IPEndPoint serverIP)
+        private void MakeConnect(IPEndPoint serverIP)
         {
             try
             {
@@ -114,27 +129,27 @@ namespace MainServer
                     if (firstMessage == "<isFileServer>")
                     {
                         FileServerHandler handler = new FileServerHandler(client);
-                        fileServers.Add(handler);
+                        ListHolder.FileServers.Add(handler);
                         handler.Start();
                     }
                     else if (firstMessage == "<isClient>")
                     {
-                        ClientHandler handler = new ClientHandler(client, fileServers);
-                        this.clients.Add(handler);
+                        ClientHandler handler = new ClientHandler(client);
+                        ListHolder.Clients.Add(handler);
                         handler.Start();
                     }
 
-                    UpdateItemList();
+                    ListHolder.UpdateList();
                 }
 
             }
             catch (ThreadAbortException)
             {
-                MessageBox.Show("Your server has closed.", "Main server: Server closed");
+                
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message, "Main server: " + e.ToString());
+                MessageBox.Show(e.Message, "Main server error: when waiting for connection");
             }
         }
 
@@ -143,13 +158,13 @@ namespace MainServer
             CloseButton_Click(this, null);
         }
 
-        public void UpdateItemList()
-        {
-            this.Dispatcher.Invoke(() =>
-            {
-                FileServerList.Items.Refresh();
-                ClientList.Items.Refresh();
-            });
-        }
+        //public void UpdateItemList()
+        //{
+        //    this.Dispatcher.Invoke(() =>
+        //    {
+        //        FileServerList.Items.Refresh();
+        //        ClientList.Items.Refresh();
+        //    });
+        //}
     }
 }

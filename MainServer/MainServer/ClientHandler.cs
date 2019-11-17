@@ -4,50 +4,52 @@ using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Windows;
 
 namespace MainServer
 {
     internal class ClientHandler
     {
         private object locker = new object();
-        private List<FileServerHandler> fileServers;
         private Thread workingWithClientThread;
         private MyStreamIO myStream;
-        public TcpClient Client { set; get; }
-
+        public TcpClient Client { get; }
 
         public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
         public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
 
 
-
-        public ClientHandler(TcpClient client, List<FileServerHandler> fileServers)
+        public ClientHandler(TcpClient client)
         {
-            lock (locker)
-            {
-                this.Client = client;
-                this.fileServers = fileServers;
-                myStream = new MyStreamIO(client.GetStream());
-            }
+            this.Client = client;
+            myStream = new MyStreamIO(client.GetStream());
         }
 
-
-
+        ~ClientHandler()
+        {
+            this.Stop();
+        }
 
         public void Start()
         {
-            workingWithClientThread = new Thread(() => WorkingWithClient(Client));
-            workingWithClientThread.Start();
+            if (workingWithClientThread == null)
+            {
+                workingWithClientThread = new Thread(() => WorkingWithClient(Client));
+                workingWithClientThread.Start();
+            }
         }
 
         public void Stop()
         {
-            if (workingWithClientThread != null)
+            lock (locker)
             {
-                workingWithClientThread.Abort();
+                Client?.GetStream()?.Close();
+                Client?.Close();
+                //Client?.Dispose();
+
+                workingWithClientThread?.Abort();
                 workingWithClientThread = null;
             }
-
         }
 
         private void WorkingWithClient(TcpClient client)
@@ -59,50 +61,58 @@ namespace MainServer
                 {
                     string request = myStream.ReadString();
 
-                    switch (request)
+                    lock (locker)
                     {
-                        case "<getAllFileInfo>":
-                            myStream.Write(fileServers.Count);
-                            myStream.GetNEXT();
-                            foreach (FileServerHandler fileServer in fileServers)
-                            {
-                                List<MyFile> files = fileServer.Files;
-
-                                myStream.Write(files.Count);
+                        switch (request)
+                        {
+                            case "<getAllFileInfo>":
+                                myStream.Write(ListHolder.FileServers.Count);
                                 myStream.GetNEXT();
-                                foreach (MyFile file in files)
+                                foreach (FileServerHandler fileServer in ListHolder.FileServers)
                                 {
-                                    myStream.Write(file.Name);
-                                    myStream.GetNEXT();
+                                    List<MyFile> files = fileServer.Files;
 
-                                    myStream.Write(file.Size);
+                                    myStream.Write(files.Count);
                                     myStream.GetNEXT();
+                                    foreach (MyFile file in files)
+                                    {
+                                        myStream.Write(file.Name);
+                                        myStream.GetNEXT();
 
-                                    myStream.Write(file.Address);
-                                    myStream.GetNEXT();
+                                        myStream.Write(file.Size);
+                                        myStream.GetNEXT();
 
-                                    myStream.Write(file.Port);
-                                    myStream.GetNEXT();
+                                        myStream.Write(file.Address);
+                                        myStream.GetNEXT();
+
+                                        myStream.Write(file.Port);
+                                        myStream.GetNEXT();
+                                    }
                                 }
-                            }
 
-                            break;
+                                break;
+
+                            default:
+                                throw new Exception("Receive strange request from client: \"" + request + "\"");
+                        }
                     }
                 }
             }
             catch (TimeoutException)
             {
-                
+                ListHolder.Clients.Remove(this);
+                ListHolder.UpdateList();
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                MyDispatcher.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(e.Message, "Main server error: when working with client");
+                });
 
+                ListHolder.Clients.Remove(this);
+                ListHolder.UpdateList();
             }
-        }
-
-        ~ClientHandler()
-        {
-            this.Stop();
         }
     }
 

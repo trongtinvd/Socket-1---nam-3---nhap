@@ -5,48 +5,68 @@ using System.Net.Sockets;
 using System.Net;
 using System.IO;
 using System.Text;
+using System.Windows;
 
 namespace FileServer
 {
     internal class ClientHandler
     {
-        private List<MyFile> fileList;
+        private object locker = new object();
         private MyStreamIO myStream;
         private IPEndPoint udpListenerIP;
         private UdpClient udpListener;
-        private TcpClient client;
         private Thread workWithClientThread;
+        private TcpClient Client { get; }
 
-        public ClientHandler(TcpClient client, List<MyFile> fileList)
+        public string Address => ((IPEndPoint)Client.Client.RemoteEndPoint).Address.ToString();
+        public int Port => ((IPEndPoint)Client.Client.RemoteEndPoint).Port;
+
+        public ClientHandler(TcpClient client)
         {
-            this.client = client;
+            this.Client = client;
             myStream = new MyStreamIO(client.GetStream());
-            this.fileList = fileList;
         }
 
-        internal void Start()
+        ~ClientHandler()
         {
-            workWithClientThread = new Thread(workWithClient);
+            this.Stop();
+        }
+
+        public void Start()
+        {
+            workWithClientThread = new Thread(WorkWithClient);
             workWithClientThread.Start();
         }
 
         public void Stop()
         {
-            myStream?.Stop();
-            myStream = null;
+            lock (locker)
+            {
+                try
+                {
+                    myStream?.Stop();
+                    myStream = null;
 
-            udpListener?.Close();
-            udpListener = null;
+                    udpListener?.Close();
+                    udpListener = null;
 
-            client?.Close();
-            client = null;
+                    Client?.GetStream()?.Close();
+                    Client?.Close();
 
-            workWithClientThread?.Abort();
-            workWithClientThread = null;
+                    workWithClientThread?.Abort();
+                    workWithClientThread = null;
 
+                    ListHolder.Clients.Remove(this);
+                    ListHolder.UpdateList();
+                }
+                catch (Exception)
+                {
+                    
+                }
+            }
         }
 
-        private void workWithClient()
+        private void WorkWithClient()
         {
             try
             {
@@ -58,7 +78,7 @@ namespace FileServer
 
 
                 string fileName = myStream.ReadString();
-                if (!fileList.Exists(c => c.FileName == fileName))
+                if (!ListHolder.Files.Exists(c => c.FileName == fileName))
                 {
                     myStream.Write("<unknownFile>");
                     return;
@@ -80,12 +100,20 @@ namespace FileServer
                 SendFile(fileName, udpClientIP);
 
                 udpListener.Close();
-
             }
-            catch
+            catch (ThreadAbortException)
             {
 
             }
+            catch (Exception e)
+            {
+                MyDispatcher.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(e.Message, "File server error: when initial sending file");
+                });
+            }
+
+            this.Stop();
         }
 
         private void SendFile(string fileName, IPEndPoint udpClientIP)
@@ -108,50 +136,47 @@ namespace FileServer
                 try
                 {
                     //udpListener.Client.ReceiveTimeout = 5000;
-                    while ((size = file.Read(buffer, 0, buffer.Length)) > 0)
+                    lock (locker)
                     {
-                        string data = Encoding.UTF8.GetString(buffer);
-                        string hash = MyMD5Hash.GetMd5Hash(buffer);
-                        byte[] hashBuffer = Encoding.UTF8.GetBytes(hash);
-
-                        do
+                        while ((size = file.Read(buffer, 0, buffer.Length)) > 0)
                         {
-                            udpListener.Send(hashBuffer, hashBuffer.Length, udpClientIP);
-                            udpListener.Send(buffer, size, udpClientIP);
+                            string data = Encoding.UTF8.GetString(buffer);
+                            string hash = MyMD5Hash.GetMd5Hash(buffer);
+                            byte[] hashBuffer = Encoding.UTF8.GetBytes(hash);
 
-                            try
+                            do
                             {
-                                relyBuffer = udpListener.Receive(ref udpClientIP);
-                                string rely = Encoding.UTF8.GetString(relyBuffer);
+                                udpListener.Send(hashBuffer, hashBuffer.Length, udpClientIP);
+                                udpListener.Send(buffer, size, udpClientIP);
 
-                                if (rely == "<ok>")
-                                    sendSuccess = true;
-                                else
+                                try
+                                {
+                                    relyBuffer = udpListener.Receive(ref udpClientIP);
+                                    string rely = Encoding.UTF8.GetString(relyBuffer);
+
+                                    if (rely == "<ok>")
+                                        sendSuccess = true;
+                                    else
+                                        sendSuccess = false;
+
+                                }
+                                catch (TimeoutException e)
+                                {
                                     sendSuccess = false;
+                                }
 
-                            }
-                            catch (TimeoutException e)
-                            {
-                                sendSuccess = false;
-                            }
+                            } while (!sendSuccess);
 
-                        } while (!sendSuccess);
-
+                        }
                     }
                 }
-                catch
+                catch (Exception e)
                 {
-
+                    MyDispatcher.Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(e.Message, "File server error: when sending file");
+                    });
                 }
-            }
-        }
-
-
-        ~ClientHandler()
-        {
-            if (client != null)
-            {
-                this.Stop();
             }
         }
     }

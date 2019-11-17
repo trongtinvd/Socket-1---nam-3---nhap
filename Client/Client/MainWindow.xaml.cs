@@ -29,15 +29,20 @@ namespace Client
         Thread connectToMainServerThread;
         TcpClient client;
 
-        List<DownloadableFile> files = new List<DownloadableFile>();
-        List<DownloadFile> downloads = new List<DownloadFile>();
-
         public MainWindow()
         {
             InitializeComponent();
 
-            FileList.ItemsSource = files;
-            DownloadList.ItemsSource = downloads;
+            ListHolder.DownloadableFiles = new List<DownloadableFile>();
+            ListHolder.DownloadedFiles = new List<DownloadedFile>();
+
+            ListHolder.DownloadableFilesList = DownloadableFileList;
+            ListHolder.DownloadedFilesList = DownloadedFileList;
+
+            ListHolder.DownloadableFilesList.ItemsSource = ListHolder.DownloadableFiles;
+            ListHolder.DownloadedFilesList.ItemsSource = ListHolder.DownloadedFiles;
+
+            MyDispatcher.Dispatcher = this.Dispatcher;
         }
 
         private void ListView_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -57,19 +62,16 @@ namespace Client
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            lock (locker)
+            if (connectToMainServerThread == null)
             {
-                if (connectToMainServerThread == null)
-                {
-                    IPEndPoint serverIPEndPoint = GetServerIP();
-                    connectToMainServerThread = new Thread(() => connectToMainServer(serverIPEndPoint));
-                    connectToMainServerThread.Start();
-                    MessageBox.Show("Client has started,", "Client: started");
-                }
-                else
-                {
-                    MessageBox.Show("Client has already started,", "Client: started");
-                }
+                IPEndPoint serverIPEndPoint = GetServerIP();
+                connectToMainServerThread = new Thread(() => connectToMainServer(serverIPEndPoint));
+                connectToMainServerThread.Start();
+                MessageBox.Show("Client has started,", "Client: started");
+            }
+            else
+            {
+                MessageBox.Show("Client has already started,", "Error");
             }
         }
 
@@ -77,14 +79,16 @@ namespace Client
         {
             lock (locker)
             {
+                client?.GetStream()?.Close();
                 client?.Close();
+                //client?.Dispose();
                 client = null;
 
                 connectToMainServerThread?.Abort();
                 connectToMainServerThread = null;
 
-                files.Clear();
-                downloads.Clear();
+                ListHolder.DownloadableFiles.Clear();
+                //ListHolder.DownloadedFiles.Clear();
 
                 MessageBox.Show("Client close", "Close");
             }
@@ -97,22 +101,25 @@ namespace Client
 
         private void connectToMainServer(IPEndPoint serverIPEndPoint)
         {
+            MyStreamIO myStream = null;
             try
             {
                 client = new TcpClient(AddressFamily.InterNetworkV6);
                 client.Connect(serverIPEndPoint);
-                MyStreamIO myStream = new MyStreamIO(client.GetStream());
+                myStream = new MyStreamIO(client.GetStream());
                 myStream.Write("<isClient>");
                 myStream.GetNEXT();
 
+
+                client.ReceiveTimeout = 7000;
                 while (true)
                 {
-                    myStream.Write("<getAllFileInfo>");
-                    int numberOfFileServer = myStream.ReadInt();
-                    myStream.SendNEXT();
                     lock (locker)
                     {
-                        files.Clear();
+                        myStream.Write("<getAllFileInfo>");
+                        int numberOfFileServer = myStream.ReadInt();
+                        myStream.SendNEXT();
+                        ListHolder.DownloadableFiles.Clear();
 
                         for (int i = 0; i < numberOfFileServer; i++)
                         {
@@ -133,19 +140,28 @@ namespace Client
                                 int port = myStream.ReadInt();
                                 myStream.SendNEXT();
 
-                                files.Add(new DownloadableFile(fileName, fileSize, ip, port));
+                                ListHolder.DownloadableFiles.Add(new DownloadableFile(fileName, fileSize, ip, port));
                             }
                         }
 
-                        UpdateItemList();
+                        ListHolder.UpdateList();
                     }
 
                     Thread.Sleep(5000);
                 }
             }
-            catch (Exception)
+            catch(TimeoutException)
             {
 
+            }
+            catch (ThreadAbortException)
+            {
+                client?.GetStream()?.Close();
+                client?.Close();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message, "Client error: when getting file info from main server");
             }
         }
 
@@ -155,19 +171,18 @@ namespace Client
             return serverIP;
         }
 
-        public void UpdateItemList()
-        {
-            this.Dispatcher.Invoke(() =>
-            {
-                FileList.Items.Refresh();
-                DownloadList.Items.Refresh();
-            });
-        }
+        //public void UpdateItemList()
+        //{
+        //    this.Dispatcher.Invoke(() =>
+        //    {
+        //        FileList.Items.Refresh();
+        //        DownloadList.Items.Refresh();
+        //    });
+        //}
 
         private void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
             DownloadableFile file = (sender as Button).DataContext as DownloadableFile;
-
             Thread downloadThread = new Thread(() => Download(file));
             downloadThread.Start();
         }
@@ -191,6 +206,7 @@ namespace Client
 
                 if (rely != "<fileFound>")
                 {
+                    client.GetStream().Close();
                     client.Close();
                     return;
                 }
@@ -205,15 +221,20 @@ namespace Client
                 myStream.Write(udpClientIP.Port);
                 int udpListenerPort = myStream.ReadInt();
 
+                client.GetStream().Close();
                 client.Close();
 
                 UdpDownload(udpClient, IPBuilder.GetIP(udpListenerIP, udpListenerPort), file);
 
                 udpClient.Close();
             }
-            catch (Exception)
+            catch (ThreadAbortException)
             {
 
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message, "Client error: when getting file info for download from file server");
             }
 
         }
@@ -260,9 +281,9 @@ namespace Client
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                
+                MessageBox.Show(e.Message, "Client error: when download file from file server");
             }
 
         }

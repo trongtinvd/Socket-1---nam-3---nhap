@@ -74,12 +74,14 @@
     <Compile Include="ClientHandler.cs" />
     <Compile Include="FileServerHandler.cs" />
     <Compile Include="IPBuilder.cs" />
+    <Compile Include="ListHolder.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MyDispatcher.cs" />
     <Compile Include="MyFile.cs" />
     <Compile Include="MyStreamIO.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
