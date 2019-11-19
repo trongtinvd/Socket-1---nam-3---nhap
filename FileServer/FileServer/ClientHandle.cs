@@ -123,8 +123,8 @@ namespace FileServer
         private void SendFile(string fileName, IPEndPoint udpClientIP)
         {
             string fileSize = new FileInfo(fileName).Length.ToString();
-            //udpListener.Client.ReceiveTimeout = 7000;
-            //udpListener.Client.SendTimeout = 7000;
+            udpListener.Client.ReceiveTimeout = 7000;
+            udpListener.Client.SendTimeout = 7000;
 
 
             byte[] messageBuffer = Encoding.UTF8.GetBytes(fileSize);

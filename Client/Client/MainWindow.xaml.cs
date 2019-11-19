@@ -237,8 +237,8 @@ namespace Client
             ListHolder.DownloadedFiles.Add(newFileInfo);
             ListHolder.UpdateList();
 
-            //udpClient.Client.ReceiveTimeout = 7000;
-            //udpClient.Client.SendTimeout = 7000;
+            udpClient.Client.ReceiveTimeout = 7000;
+            udpClient.Client.SendTimeout = 7000;
             try
             {
                 byte[] relyBuffer = udpClient.Receive(ref udpListenerIP);
